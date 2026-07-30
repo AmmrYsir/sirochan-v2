@@ -41,14 +41,18 @@ const thumbSrc = item.coverImage || ANIME_PLACEHOLDER;
   .anime-card {
     display: flex;
     flex-direction: column;
-    width: 220px;
-    flex-shrink: 0;
+    width: 100%;
     text-decoration: none;
     transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   }
 
+  :global(.scroll-row) .anime-card {
+    width: 220px;
+    flex-shrink: 0;
+  }
+
   @media (min-width: 640px) {
-    .anime-card {
+    :global(.scroll-row) .anime-card {
       width: 260px;
     }
   }

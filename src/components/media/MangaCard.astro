@@ -36,14 +36,18 @@ const coverSrc = item.coverImage || MANGA_PLACEHOLDER;
   .manga-card {
     display: flex;
     flex-direction: column;
-    width: 140px;
-    flex-shrink: 0;
+    width: 100%;
     text-decoration: none;
     transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   }
 
+  :global(.scroll-row) .manga-card {
+    width: 140px;
+    flex-shrink: 0;
+  }
+
   @media (min-width: 640px) {
-    .manga-card {
+    :global(.scroll-row) .manga-card {
       width: 160px;
     }
   }

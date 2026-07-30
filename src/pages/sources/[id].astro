@@ -192,6 +192,10 @@ const genres = ['All', 'Action', 'Dark Fantasy', 'Sports', 'Drama', 'Sci-Fi', 'S
           )
         ))}
       </div>
+      <div class="empty-catalog-state hidden" id="empty-state">
+        <span class="empty-icon">🔍</span>
+        <p>No matching titles found in this catalog.</p>
+      </div>
     </section>
   </div>
 </MainLayout>
@@ -203,23 +207,36 @@ const genres = ['All', 'Action', 'Dark Fantasy', 'Sports', 'Drama', 'Sci-Fi', 'S
   const sortBtns = document.querySelectorAll('.sort-pill');
   const gridContainer = document.getElementById('catalog-grid');
 
+  const emptyStateEl = document.getElementById('empty-state');
+
   let currentGenre = 'All';
   let currentSearch = '';
 
   function filterCatalog() {
+    let visibleCount = 0;
     mediaCards.forEach(card => {
       const cardEl = card as HTMLElement;
-      const title = cardEl.querySelector('.card-title, .anime-card-title')?.textContent?.toLowerCase() || '';
+      const title = (cardEl.getAttribute('data-title') || cardEl.querySelector('.card-title')?.textContent || '').toLowerCase();
+      const genres = (cardEl.getAttribute('data-genres') || '').toLowerCase();
 
-      const matchesSearch = title.includes(currentSearch);
-      const matchesGenre = currentGenre === 'All';
+      const matchesSearch = !currentSearch || title.includes(currentSearch);
+      const matchesGenre = currentGenre === 'All' || genres.includes(currentGenre.toLowerCase());
 
       if (matchesSearch && matchesGenre) {
         cardEl.style.display = 'flex';
+        visibleCount++;
       } else {
         cardEl.style.display = 'none';
       }
     });
+
+    if (emptyStateEl) {
+      if (visibleCount === 0) {
+        emptyStateEl.classList.remove('hidden');
+      } else {
+        emptyStateEl.classList.add('hidden');
+      }
+    }
   }
 
   if (searchInput) {
@@ -453,7 +470,8 @@ const genres = ['All', 'Action', 'Dark Fantasy', 'Sports', 'Drama', 'Sci-Fi', 'S
   .catalog-section {
     display: flex;
     flex-direction: column;
-    gap: 20px;
+    gap: 24px;
+    margin-bottom: 36px;
   }
 
   .section-header-row {
@@ -461,12 +479,12 @@ const genres = ['All', 'Action', 'Dark Fantasy', 'Sports', 'Drama', 'Sci-Fi', 'S
     align-items: center;
     justify-content: space-between;
     border-bottom: 1px solid var(--border-subtle);
-    padding-bottom: 10px;
+    padding-bottom: 12px;
   }
 
   .section-title {
     font-family: var(--font-hero);
-    font-size: 1.2rem;
+    font-size: 1.25rem;
     font-weight: 800;
     letter-spacing: 0.04em;
   }
@@ -545,18 +563,47 @@ const genres = ['All', 'Action', 'Dark Fantasy', 'Sports', 'Drama', 'Sci-Fi', 'S
     gap: 16px;
     overflow-x: auto;
     padding-bottom: 12px;
+    align-items: flex-start;
   }
 
   .media-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-    gap: 20px 16px;
+    grid-template-columns: repeat(auto-fill, minmax(145px, 1fr));
+    gap: 24px 16px;
+    align-items: start;
   }
 
   @media (min-width: 640px) {
     .media-grid {
-      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-      gap: 24px 20px;
+      grid-template-columns: repeat(auto-fill, minmax(175px, 1fr));
+      gap: 28px 20px;
     }
   }
+
+  @media (min-width: 1024px) {
+    .media-grid {
+      grid-template-columns: repeat(auto-fill, minmax(195px, 1fr));
+      gap: 32px 24px;
+    }
+  }
+
+  .empty-catalog-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 48px 20px;
+    background-color: var(--bg-surface);
+    border: 1px dashed var(--border-subtle);
+    border-radius: var(--radius-lg);
+    color: var(--text-muted);
+    text-align: center;
+    gap: 10px;
+    margin-top: 12px;
+  }
+
+  .empty-icon {
+    font-size: 2rem;
+  }
+
 </style>
