@@ -1,4 +1,4 @@
-import type { MediaItem, UserProfile } from '../types';
+import type { MediaItem, UserProfile, MediaSource } from '../types';
 
 export const currentUser: UserProfile = {
   id: 'usr_01',
@@ -11,6 +11,81 @@ export const currentUser: UserProfile = {
   preferredReaderMode: 'continuous',
   preferredStreamQuality: '1080p'
 };
+
+export const mockSources: MediaSource[] = [
+  {
+    id: 'mangadex',
+    name: 'MangaDex',
+    type: 'manga',
+    language: 'MULTI',
+    icon: '📚',
+    isPinned: true,
+    status: 'ONLINE',
+    pingMs: 18,
+    itemCount: '120,000+',
+    description: 'Community-driven open manga database with multi-language releases.'
+  },
+  {
+    id: 'hianime',
+    name: 'HiAnime (AniWave)',
+    type: 'anime',
+    language: 'EN',
+    icon: '⚡',
+    isPinned: true,
+    status: 'ONLINE',
+    pingMs: 24,
+    itemCount: '18,000+',
+    description: 'High-speed HD anime streaming provider with sub & dub tracks.'
+  },
+  {
+    id: 'mangaplus',
+    name: 'MangaPlus (Official)',
+    type: 'manga',
+    language: 'EN',
+    icon: '🔥',
+    isPinned: true,
+    status: 'ONLINE',
+    pingMs: 12,
+    itemCount: '5,000+',
+    description: 'Official Shueisha simulpub manga release platform.'
+  },
+  {
+    id: 'asurascans',
+    name: 'Asura Scans',
+    type: 'manga',
+    language: 'EN',
+    icon: '⚔️',
+    isPinned: false,
+    status: 'ONLINE',
+    pingMs: 32,
+    itemCount: '2,500+',
+    description: 'High quality action manhwa and fantasy webtoon translations.'
+  },
+  {
+    id: 'gogoanime',
+    name: 'Gogoanime',
+    type: 'anime',
+    language: 'EN',
+    icon: '🎬',
+    isPinned: false,
+    status: 'ONLINE',
+    pingMs: 28,
+    itemCount: '22,000+',
+    description: 'Extensive classic and ongoing anime video collection.'
+  },
+  {
+    id: 'reaperscans',
+    name: 'Reaper Scans',
+    type: 'manga',
+    language: 'EN',
+    icon: '💀',
+    isPinned: false,
+    status: 'ONLINE',
+    pingMs: 40,
+    itemCount: '1,800+',
+    description: 'Dark fantasy and necromancer webtoon scanlations.'
+  }
+];
 
 export const mockMediaList: MediaItem[] = [
   {

@@ -1,0 +1,427 @@
+---
+import MainLayout from '../../layouts/MainLayout.astro';
+import MangaCard from '../../components/media/MangaCard.astro';
+import AnimeCard from '../../components/media/AnimeCard.astro';
+import Badge from '../../components/common/Badge.astro';
+import Button from '../../components/common/Button.astro';
+import { mockSources, mockMediaList } from '../../db/mockData';
+
+export function getStaticPaths() {
+  return mockSources.map(src => ({
+    params: { id: src.id }
+  }));
+}
+
+const { id } = Astro.params;
+const source = mockSources.find(s => s.id === id) || mockSources[0];
+
+// Media items associated with this source (or filtered by media type)
+const sourceMedia = mockMediaList.filter(m => m.type === source.type || source.type === 'dual');
+const popularItems = sourceMedia.slice(0, 4);
+const genres = ['All', 'Action', 'Dark Fantasy', 'Sports', 'Drama', 'Sci-Fi', 'Supernatural'];
+---
+
+<MainLayout title={`${source.name} - Sirochan Source Browser`} activeTab="discover">
+  <div class="source-browser-page container-constrained">
+    <!-- Breadcrumb Navigation -->
+    <nav class="breadcrumb-nav">
+      <a href="/discover" class="bc-link">Discover</a>
+      <span class="bc-sep">/</span>
+      <a href="/discover" class="bc-link">Sources</a>
+      <span class="bc-sep">/</span>
+      <span class="bc-current">{source.name}</span>
+    </nav>
+
+    <!-- Source Provider Masthead Banner -->
+    <div class="source-masthead">
+      <div class="masthead-main">
+        <div class="source-avatar-icon">{source.icon}</div>
+        <div class="source-masthead-info">
+          <div class="source-title-row">
+            <h1 class="source-title">{source.name}</h1>
+            <Badge variant={source.type === 'manga' ? 'red' : 'orange'}>
+              {source.type.toUpperCase()} PROVIDER
+            </Badge>
+          </div>
+          <p class="source-desc">{source.description}</p>
+          <div class="source-stats-row">
+            <span class="stat-tag"><span class="ping-dot"></span> {source.status} ({source.pingMs}ms)</span>
+            <span class="stat-sep">•</span>
+            <span class="stat-tag">{source.itemCount} CATALOG TITLES</span>
+            <span class="stat-sep">•</span>
+            <span class="stat-tag">LANG: {source.language}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="masthead-actions">
+        <Button href="/discover" variant="secondary" size="md">
+          🔄 SWITCH SOURCE
+        </Button>
+        <button class="pin-source-btn" id="pin-btn">
+          ★ PIN SOURCE
+        </button>
+      </div>
+    </div>
+
+    <!-- Catalog Search & Filter Bar -->
+    <div class="catalog-filter-bar">
+      <div class="search-box">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="search-icon">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+        <input type="text" placeholder={`Search inside ${source.name} catalog...`} class="search-input" id="catalog-search" />
+      </div>
+
+      <div class="sort-select-wrapper">
+        <select class="sort-select" id="sort-select">
+          <option value="popular">Popularity ↓</option>
+          <option value="latest">Latest Updates</option>
+          <option value="rating">Highest Rated</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Genre Chips Row -->
+    <div class="genre-row hide-scrollbar">
+      {genres.map((g, idx) => (
+        <button class={`genre-chip ${idx === 0 ? 'active' : ''}`}>{g}</button>
+      ))}
+    </div>
+
+    <!-- Popular on This Source Section -->
+    <section class="catalog-section">
+      <div class="section-header">
+        <h2 class="section-title">POPULAR ON {source.name.toUpperCase()}</h2>
+      </div>
+      <div class="scroll-row hide-scrollbar">
+        {popularItems.map(item => (
+          item.type === 'manga' ? (
+            <MangaCard item={item} />
+          ) : (
+            <AnimeCard item={item} />
+          )
+        ))}
+      </div>
+    </section>
+
+    <!-- Full Source Catalog Grid -->
+    <section class="catalog-section">
+      <div class="section-header">
+        <h2 class="section-title">ALL CATALOG TITLES ({sourceMedia.length})</h2>
+      </div>
+      <div class="media-grid" id="catalog-grid">
+        {sourceMedia.map(item => (
+          item.type === 'manga' ? (
+            <MangaCard item={item} />
+          ) : (
+            <AnimeCard item={item} />
+          )
+        ))}
+      </div>
+    </section>
+  </div>
+</MainLayout>
+
+<script>
+  const searchInput = document.getElementById('catalog-search') as HTMLInputElement;
+  const genreChips = document.querySelectorAll('.genre-chip');
+  const mediaCards = document.querySelectorAll('.manga-card, .anime-card');
+  const pinBtn = document.getElementById('pin-btn');
+
+  let currentGenre = 'All';
+  let searchQuery = '';
+
+  function filterCatalog() {
+    mediaCards.forEach(card => {
+      const title = card.getAttribute('data-title') || '';
+      const genres = card.getAttribute('data-genres') || '';
+
+      const matchesSearch = !searchQuery || title.includes(searchQuery.toLowerCase());
+      const matchesGenre = currentGenre === 'All' || genres.includes(currentGenre.toLowerCase());
+
+      if (matchesSearch && matchesGenre) {
+        (card as HTMLElement).style.display = 'flex';
+      } else {
+        (card as HTMLElement).style.display = 'none';
+      }
+    });
+  }
+
+  searchInput?.addEventListener('input', (e) => {
+    searchQuery = (e.target as HTMLInputElement).value;
+    filterCatalog();
+  });
+
+  genreChips.forEach(chip => {
+    chip.addEventListener('click', () => {
+      genreChips.forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      currentGenre = chip.textContent?.trim() || 'All';
+      filterCatalog();
+    });
+  });
+
+  pinBtn?.addEventListener('click', () => {
+    if (pinBtn.textContent?.includes('PINNED')) {
+      pinBtn.textContent = '★ PIN SOURCE';
+      pinBtn.classList.remove('pinned');
+    } else {
+      pinBtn.textContent = '★ PINNED';
+      pinBtn.classList.add('pinned');
+    }
+  });
+</script>
+
+<style>
+  .source-browser-page {
+    padding-top: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  /* Breadcrumbs */
+  .breadcrumb-nav {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+  }
+
+  .bc-link {
+    color: var(--text-muted);
+  }
+  .bc-link:hover {
+    color: var(--text-primary);
+  }
+  .bc-sep {
+    color: var(--text-dim);
+  }
+  .bc-current {
+    color: var(--accent-red);
+    font-weight: 700;
+  }
+
+  /* Masthead */
+  .source-masthead {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    padding: 24px;
+    background-color: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+  }
+
+  @media (min-width: 768px) {
+    .source-masthead {
+      flex-direction: row;
+      align-items: center;
+      justify-content: space-between;
+    }
+  }
+
+  .masthead-main {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+  }
+
+  .source-avatar-icon {
+    font-size: 2.5rem;
+    line-height: 1;
+    padding: 12px;
+    background-color: var(--bg-elevated);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+  }
+
+  .source-masthead-info {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .source-title-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .source-title {
+    font-family: var(--font-hero);
+    font-size: 1.8rem;
+    font-weight: 800;
+  }
+
+  .source-desc {
+    font-size: 0.9rem;
+    color: var(--text-secondary);
+  }
+
+  .source-stats-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 4px;
+  }
+
+  .ping-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: var(--radius-full);
+    background-color: #2ec4b6;
+    display: inline-block;
+  }
+
+  .stat-sep {
+    color: var(--text-dim);
+  }
+
+  .masthead-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .pin-source-btn {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    font-weight: 700;
+    padding: 10px 16px;
+    border-radius: var(--radius-md);
+    background-color: var(--bg-elevated);
+    color: #ffffff;
+    border: 1px solid var(--border-subtle);
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .pin-source-btn:hover {
+    border-color: var(--accent-orange);
+    color: var(--accent-orange);
+  }
+
+  .pin-source-btn.pinned {
+    background-color: var(--accent-orange);
+    color: #000000;
+    border-color: var(--accent-orange);
+  }
+
+  /* Catalog Filter Bar */
+  .catalog-filter-bar {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  @media (min-width: 640px) {
+    .catalog-filter-bar {
+      flex-direction: row;
+      align-items: center;
+    }
+  }
+
+  .search-box {
+    position: relative;
+    flex: 1;
+  }
+
+  .search-icon {
+    position: absolute;
+    left: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+  }
+
+  .search-input {
+    width: 100%;
+    height: 48px;
+    padding-left: 48px;
+    padding-right: 16px;
+    background-color: var(--bg-elevated);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    color: #ffffff;
+    font-family: var(--font-body);
+    font-size: 0.95rem;
+    outline: none;
+  }
+
+  .search-input:focus {
+    border-color: #ffffff;
+  }
+
+  .sort-select {
+    height: 48px;
+    padding: 0 16px;
+    background-color: var(--bg-elevated);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    color: #ffffff;
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    outline: none;
+    cursor: pointer;
+  }
+
+  .genre-row {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 8px;
+  }
+
+  .genre-chip {
+    padding: 6px 14px;
+    border-radius: var(--radius-full);
+    font-size: 0.8rem;
+    font-weight: 500;
+    white-space: nowrap;
+    background-color: var(--bg-elevated);
+    color: var(--text-muted);
+    border: 1px solid var(--border-subtle);
+    cursor: pointer;
+  }
+
+  .genre-chip.active {
+    background-color: #ffffff;
+    color: #000000;
+    border-color: #ffffff;
+    font-weight: 700;
+  }
+
+  /* Catalog Sections */
+  .catalog-section {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .scroll-row {
+    display: flex;
+    gap: 16px;
+    overflow-x: auto;
+    padding-bottom: 8px;
+  }
+
+  .media-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 20px 16px;
+  }
+
+  @media (min-width: 640px) {
+    .media-grid {
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 24px 20px;
+    }
+  }
+</style>

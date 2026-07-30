@@ -2,74 +2,181 @@
 import MainLayout from '../layouts/MainLayout.astro';
 import MangaCard from '../components/media/MangaCard.astro';
 import AnimeCard from '../components/media/AnimeCard.astro';
-import { mockMediaList } from '../db/mockData';
+import Badge from '../components/common/Badge.astro';
+import { mockSources, mockMediaList } from '../db/mockData';
 
 const genres = ['All', 'Action', 'Dark Fantasy', 'Sports', 'Drama', 'Sci-Fi', 'Supernatural'];
 ---
 
-<MainLayout title="Discover - Sirochan" activeTab="discover">
+<MainLayout title="Discover Sources - Sirochan" activeTab="discover">
   <div class="discover-page container-constrained">
-    <div class="search-header">
-      <h1 class="page-title">DISCOVER</h1>
-      
-      <!-- Search Input -->
-      <div class="search-box">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="search-icon">
-          <circle cx="11" cy="11" r="8"></circle>
-          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-        </svg>
-        <input type="text" placeholder="Search title, author, or genre..." class="search-input" id="discover-search" />
+    <!-- Header Title -->
+    <div class="discover-masthead">
+      <h1 class="page-title">DISCOVER & SOURCES</h1>
+      <p class="page-subtitle">Select your content provider source to explore manga chapters and anime streams.</p>
+    </div>
+
+    <!-- Source Selection View (Default Active Mode) -->
+    <section class="sources-section" id="sources-view">
+      <div class="section-top-bar">
+        <h2 class="section-title">CHOOSE PROVIDER SOURCE FIRST</h2>
+        <div class="source-type-filter">
+          <button class="source-tab active" data-source-type="all">All ({mockSources.length})</button>
+          <button class="source-tab" data-source-type="manga">Manga Providers</button>
+          <button class="source-tab" data-source-type="anime">Anime Providers</button>
+        </div>
       </div>
 
-      <!-- Type Filter Tabs -->
-      <div class="filter-type-tabs">
-        <button class="type-tab active" data-type="all">All Media</button>
-        <button class="type-tab" data-type="manga">Manga Only</button>
-        <button class="type-tab" data-type="anime">Anime Only</button>
-      </div>
+      <!-- Sources Grid -->
+      <div class="sources-grid">
+        {mockSources.map((src) => (
+          <a href={`/sources/${src.id}`} class="source-card" data-id={src.id} data-name={src.name} data-type={src.type}>
+            <div class="source-card-header">
+              <div class="source-brand">
+                <span class="source-icon">{src.icon}</span>
+                <div class="source-titles">
+                  <h3 class="source-name">{src.name}</h3>
+                  <span class="source-meta">{src.itemCount} TITLES • {src.language}</span>
+                </div>
+              </div>
+              <Badge variant={src.type === 'manga' ? 'red' : 'orange'}>{src.type}</Badge>
+            </div>
 
-      <!-- Genre Pills -->
-      <div class="genre-row hide-scrollbar">
-        {genres.map((g, idx) => (
-          <button class={`genre-chip ${idx === 0 ? 'active' : ''}`}>{g}</button>
+            <p class="source-desc">{src.description}</p>
+
+            <div class="source-card-footer">
+              <span class="status-ping">
+                <span class="ping-dot"></span> {src.status} ({src.pingMs}ms)
+              </span>
+              <span class="select-source-btn">
+                SELECT SOURCE →
+              </span>
+            </div>
+          </a>
         ))}
       </div>
-    </div>
+    </section>
 
-    <!-- Media Grid -->
-    <div class="media-grid">
-      {mockMediaList.map(item => (
-        item.type === 'manga' ? (
-          <MangaCard item={item} />
-        ) : (
-          <AnimeCard item={item} />
-        )
-      ))}
-    </div>
+    <!-- Active Source Browser Workspace (Revealed on Source Select) -->
+    <section class="active-source-workspace hidden" id="workspace-view">
+      <!-- Active Source Status Header Bar -->
+      <div class="active-source-bar">
+        <div class="active-source-info">
+          <span class="active-label">ACTIVE PROVIDER:</span>
+          <span class="active-name" id="active-source-name">MangaDex</span>
+          <Badge variant="red" id="active-source-type">MANGA</Badge>
+        </div>
+        <button class="change-source-btn" id="change-source-btn">
+          🔄 SWITCH SOURCE
+        </button>
+      </div>
+
+      <!-- Source Search & Filters -->
+      <div class="source-search-group">
+        <div class="search-box">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="search-icon">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <input type="text" placeholder="Search within selected source..." class="search-input" id="source-search-input" />
+        </div>
+
+        <div class="genre-row hide-scrollbar">
+          {genres.map((g, idx) => (
+            <button class={`genre-chip ${idx === 0 ? 'active' : ''}`}>{g}</button>
+          ))}
+        </div>
+      </div>
+
+      <!-- Media Grid from Selected Source -->
+      <div class="media-grid" id="source-media-grid">
+        {mockMediaList.map(item => (
+          item.type === 'manga' ? (
+            <MangaCard item={item} />
+          ) : (
+            <AnimeCard item={item} />
+          )
+        ))}
+      </div>
+    </section>
   </div>
 </MainLayout>
 
 <script>
-  const searchInput = document.getElementById('discover-search') as HTMLInputElement;
-  const typeTabs = document.querySelectorAll('.type-tab');
+  // DOM Elements
+  const sourcesView = document.getElementById('sources-view');
+  const workspaceView = document.getElementById('workspace-view');
+  const selectBtns = document.querySelectorAll('.select-source-btn');
+  const changeBtn = document.getElementById('change-source-btn');
+  const activeNameEl = document.getElementById('active-source-name');
+  const activeTypeEl = document.getElementById('active-source-type');
+  const sourceTabs = document.querySelectorAll('.source-tab');
+  const sourceCards = document.querySelectorAll('.source-card');
+  const searchInput = document.getElementById('source-search-input') as HTMLInputElement;
   const genreChips = document.querySelectorAll('.genre-chip');
-  const cards = document.querySelectorAll('.manga-card, .anime-card');
+  const mediaCards = document.querySelectorAll('.manga-card, .anime-card');
 
-  let activeType = 'all';
-  let activeGenre = 'All';
-  let searchQuery = '';
+  let currentSourceType = 'manga';
 
-  function filterCards() {
-    cards.forEach(card => {
-      const cardType = card.getAttribute('data-type') || '';
-      const cardTitle = card.getAttribute('data-title') || '';
-      const cardGenres = card.getAttribute('data-genres') || '';
+  // Source Selection logic
+  selectBtns.forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const srcId = btn.getAttribute('data-src-id') || 'mangadex';
+      const srcName = btn.getAttribute('data-src-name') || 'MangaDex';
+      const cardEl = btn.closest('.source-card');
+      const srcType = cardEl?.getAttribute('data-type') || 'manga';
 
-      const matchesType = activeType === 'all' || cardType === activeType;
-      const matchesGenre = activeGenre === 'All' || cardGenres.includes(activeGenre.toLowerCase());
-      const matchesSearch = !searchQuery || cardTitle.includes(searchQuery.toLowerCase()) || cardGenres.includes(searchQuery.toLowerCase());
+      currentSourceType = srcType;
 
-      if (matchesType && matchesGenre && matchesSearch) {
+      if (activeNameEl) activeNameEl.textContent = srcName;
+      if (activeTypeEl) activeTypeEl.textContent = srcType.toUpperCase();
+
+      // Show workspace & hide selection
+      sourcesView?.classList.add('hidden');
+      workspaceView?.classList.remove('hidden');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+
+      filterMediaCards('');
+    });
+  });
+
+  // Switch back to source selection
+  changeBtn?.addEventListener('click', () => {
+    workspaceView?.classList.add('hidden');
+    sourcesView?.classList.remove('hidden');
+  });
+
+  // Source Type Filter Tabs (Manga vs Anime providers)
+  sourceTabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      sourceTabs.forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+
+      const filterType = tab.getAttribute('data-source-type');
+      sourceCards.forEach(card => {
+        const cType = card.getAttribute('data-type');
+        if (filterType === 'all' || cType === filterType) {
+          (card as HTMLElement).style.display = 'flex';
+        } else {
+          (card as HTMLElement).style.display = 'none';
+        }
+      });
+    });
+  });
+
+  // Media Grid filtering inside active source
+  function filterMediaCards(query: string, genre: string = 'All') {
+    mediaCards.forEach(card => {
+      const cType = card.getAttribute('data-type') || '';
+      const cTitle = card.getAttribute('data-title') || '';
+      const cGenres = card.getAttribute('data-genres') || '';
+
+      const matchesType = cType === currentSourceType;
+      const matchesSearch = !query || cTitle.includes(query.toLowerCase());
+      const matchesGenre = genre === 'All' || cGenres.includes(genre.toLowerCase());
+
+      if (matchesType && matchesSearch && matchesGenre) {
         (card as HTMLElement).style.display = 'flex';
       } else {
         (card as HTMLElement).style.display = 'none';
@@ -77,49 +184,265 @@ const genres = ['All', 'Action', 'Dark Fantasy', 'Sports', 'Drama', 'Sci-Fi', 'S
     });
   }
 
-  typeTabs.forEach(tab => {
-    tab.addEventListener('click', () => {
-      typeTabs.forEach(t => t.classList.remove('active'));
-      tab.classList.add('active');
-      activeType = tab.getAttribute('data-type') || 'all';
-      filterCards();
-    });
+  searchInput?.addEventListener('input', (e) => {
+    filterMediaCards((e.target as HTMLInputElement).value);
   });
 
   genreChips.forEach(chip => {
     chip.addEventListener('click', () => {
       genreChips.forEach(c => c.classList.remove('active'));
       chip.classList.add('active');
-      activeGenre = chip.textContent?.trim() || 'All';
-      filterCards();
+      filterMediaCards(searchInput?.value || '', chip.textContent?.trim() || 'All');
     });
-  });
-
-  searchInput?.addEventListener('input', (e) => {
-    searchQuery = (e.target as HTMLInputElement).value;
-    filterCards();
   });
 </script>
 
 <style>
   .discover-page {
-    padding-top: 20px;
+    padding-top: 24px;
     display: flex;
     flex-direction: column;
-    gap: 24px;
+    gap: 28px;
+  }
+
+  .discover-masthead {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
   }
 
   .page-title {
     font-family: var(--font-hero);
     font-size: 2rem;
     font-weight: 800;
+    line-height: 1.1;
+  }
+
+  .page-subtitle {
+    font-size: 0.9rem;
+    color: var(--text-muted);
+  }
+
+  /* Sources View Header */
+  .section-top-bar {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
     margin-bottom: 16px;
+  }
+
+  @media (min-width: 640px) {
+    .section-top-bar {
+      flex-direction: row;
+      align-items: center;
+      justify-content: space-between;
+    }
+  }
+
+  .source-type-filter {
+    display: flex;
+    gap: 8px;
+  }
+
+  .source-tab {
+    padding: 6px 14px;
+    border-radius: var(--radius-md);
+    font-family: var(--font-body);
+    font-size: 0.8rem;
+    font-weight: 600;
+    background-color: var(--bg-surface);
+    color: var(--text-muted);
+    border: 1px solid var(--border-subtle);
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .source-tab.active {
+    background-color: var(--accent-red);
+    color: #ffffff;
+    border-color: var(--accent-red);
+  }
+
+  /* Sources Grid */
+  .sources-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  @media (min-width: 640px) {
+    .sources-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .sources-grid {
+      grid-template-columns: repeat(3, 1fr);
+    }
+  }
+
+  .source-card {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 20px;
+    background-color: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    transition: all 0.2s ease;
+  }
+
+  .source-card:hover {
+    border-color: var(--text-muted);
+    background-color: var(--bg-elevated);
+    transform: translateY(-2px);
+  }
+
+  .source-card-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .source-brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .source-icon {
+    font-size: 1.8rem;
+    line-height: 1;
+  }
+
+  .source-titles {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .source-name {
+    font-family: var(--font-hero);
+    font-size: 1.15rem;
+    font-weight: 800;
+    color: #ffffff;
+  }
+
+  .source-meta {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    color: var(--text-muted);
+  }
+
+  .source-desc {
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    line-height: 1.45;
+  }
+
+  .source-card-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding-top: 12px;
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  .status-ping {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    color: var(--text-muted);
+  }
+
+  .ping-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: var(--radius-full);
+    background-color: #2ec4b6;
+    display: inline-block;
+  }
+
+  .select-source-btn {
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--accent-red);
+    letter-spacing: 0.03em;
+    cursor: pointer;
+    transition: color 0.2s ease;
+  }
+
+  .select-source-btn:hover {
+    color: #ffffff;
+  }
+
+  /* Active Workspace View */
+  .active-source-workspace {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  .active-source-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    background-color: var(--bg-elevated);
+    border: 1px solid var(--accent-red);
+    border-radius: var(--radius-lg);
+  }
+
+  .active-source-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .active-label {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--text-muted);
+  }
+
+  .active-name {
+    font-family: var(--font-hero);
+    font-size: 1.2rem;
+    font-weight: 800;
+    color: #ffffff;
+  }
+
+  .change-source-btn {
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: #ffffff;
+    background-color: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    padding: 6px 14px;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+  }
+
+  .change-source-btn:hover {
+    background-color: var(--accent-red);
+    border-color: var(--accent-red);
+  }
+
+  .source-search-group {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
   }
 
   .search-box {
     position: relative;
     width: 100%;
-    margin-bottom: 16px;
   }
 
   .search-icon {
@@ -142,35 +465,10 @@ const genres = ['All', 'Action', 'Dark Fantasy', 'Sports', 'Drama', 'Sci-Fi', 'S
     font-family: var(--font-body);
     font-size: 0.95rem;
     outline: none;
-    transition: border-color 0.2s ease;
   }
 
   .search-input:focus {
     border-color: #ffffff;
-  }
-
-  .filter-type-tabs {
-    display: flex;
-    gap: 8px;
-    margin-bottom: 16px;
-  }
-
-  .type-tab {
-    padding: 8px 16px;
-    border-radius: var(--radius-md);
-    font-family: var(--font-body);
-    font-size: 0.85rem;
-    font-weight: 600;
-    background-color: var(--bg-surface);
-    color: var(--text-muted);
-    border: 1px solid var(--border-subtle);
-    transition: all 0.2s ease;
-  }
-
-  .type-tab.active {
-    background-color: var(--accent-red);
-    color: #ffffff;
-    border-color: var(--accent-red);
   }
 
   .genre-row {
@@ -189,6 +487,7 @@ const genres = ['All', 'Action', 'Dark Fantasy', 'Sports', 'Drama', 'Sci-Fi', 'S
     background-color: var(--bg-elevated);
     color: var(--text-muted);
     border: 1px solid var(--border-subtle);
+    cursor: pointer;
   }
 
   .genre-chip.active {
@@ -209,5 +508,9 @@ const genres = ['All', 'Action', 'Dark Fantasy', 'Sports', 'Drama', 'Sci-Fi', 'S
       grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
       gap: 24px 20px;
     }
+  }
+
+  .hidden {
+    display: none !important;
   }
 </style>

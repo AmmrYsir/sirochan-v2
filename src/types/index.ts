@@ -24,11 +24,25 @@ export interface AnimeEpisode {
   watchProgressPercent?: number;
 }
 
+export interface MediaSource {
+  id: string;
+  name: string;
+  type: 'manga' | 'anime' | 'dual';
+  language: string; // e.g. 'EN', 'JP', 'MULTI'
+  icon: string;
+  isPinned?: boolean;
+  status: 'ONLINE' | 'MAINTENANCE' | 'SLOW';
+  pingMs: number;
+  itemCount: string; // e.g. '45,000+'
+  description: string;
+}
+
 export interface MediaItem {
   id: string;
   title: string;
   japaneseTitle?: string;
   type: MediaType;
+  sourceId?: string;
   coverImage: string;
   bannerImage: string;
   description: string;
