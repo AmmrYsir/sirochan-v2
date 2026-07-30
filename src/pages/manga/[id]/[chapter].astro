@@ -26,33 +26,44 @@ export async function getStaticPaths() {
 
 const { id, chapter } = Astro.params;
 
-// Resolve real live reader pages from http://localhost:8000 microservice!
-let realPagesData = null;
+const chNum = chapter?.includes('-ch-') ? chapter.split('-ch-').pop() : (chapter?.includes('ch-') ? chapter.split('ch-').pop() : '1');
+const candidates: (string | undefined)[] = Array.from(new Set([
+  chapter,
+  chNum,
+  chNum ? `ch-${chNum}` : undefined,
+  chNum ? `chapter-${chNum}` : undefined,
+  undefined
+]));
+
+let realPagesData: any = null;
 
 if (id) {
   const sources = await ApiService.getSources();
   for (const src of sources) {
     if (src.type === 'manga' || src.type === 'dual') {
-      // 1. Try direct fetch with URL id
-      let readerData = await ApiService.getReaderPages(src.id, id, chapter);
+      const targetTitleIds = [id];
+      const catalog = await ApiService.browseSource(src.id);
+      const match = catalog.items.find(item => {
+        const safe = (item.sourceTitleId || 'title').replace(/[\/\s]/g, '-').toLowerCase();
+        return safe === id || item.sourceTitleId === id || safe.includes(id) || id.includes(safe);
+      });
 
-      // 2. If direct fetch returned no pages, browse source to find matching raw sourceTitleId
-      if (!readerData || !readerData.pages || readerData.pages.length === 0) {
-        const catalog = await ApiService.browseSource(src.id);
-        const match = catalog.items.find(item => {
-          const safe = (item.sourceTitleId || 'title').replace(/[\/\s]/g, '-').toLowerCase();
-          return safe === id || item.sourceTitleId === id || safe.includes(id) || id.includes(safe);
-        });
+      if (match && match.sourceTitleId && !targetTitleIds.includes(match.sourceTitleId)) {
+        targetTitleIds.push(match.sourceTitleId);
+      }
 
-        if (match) {
-          readerData = await ApiService.getReaderPages(src.id, match.sourceTitleId, chapter);
+      for (const titleId of targetTitleIds) {
+        for (const cand of candidates) {
+          const res = await ApiService.getReaderPages(src.id, titleId, cand);
+          if (res && res.pages && res.pages.length > 0) {
+            realPagesData = res;
+            break;
+          }
         }
+        if (realPagesData) break;
       }
 
-      if (readerData && readerData.pages && readerData.pages.length > 0) {
-        realPagesData = readerData;
-        break;
-      }
+      if (realPagesData) break;
     }
   }
 }

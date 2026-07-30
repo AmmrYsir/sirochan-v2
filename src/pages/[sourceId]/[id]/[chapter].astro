@@ -26,19 +26,38 @@ export async function getStaticPaths() {
 
 const { sourceId, id, chapter } = Astro.params;
 
-// Direct 1-shot API call to microservice reader pages!
-let realPagesData = await ApiService.getReaderPages(sourceId, id, chapter);
+const chNum = chapter?.includes('-ch-') ? chapter.split('-ch-').pop() : (chapter?.includes('ch-') ? chapter.split('ch-').pop() : '1');
+const candidates: (string | undefined)[] = Array.from(new Set([
+  chapter,
+  chNum,
+  chNum ? `ch-${chNum}` : undefined,
+  chNum ? `chapter-${chNum}` : undefined,
+  undefined
+]));
 
-// Fallback if URL slug differs from raw sourceTitleId
-if (!realPagesData || !realPagesData.pages || realPagesData.pages.length === 0) {
+let realPagesData: any = null;
+
+if (sourceId && id) {
+  const targetTitleIds = [id];
   const catalog = await ApiService.browseSource(sourceId);
   const match = catalog.items.find(item => {
     const safe = (item.sourceTitleId || 'title').replace(/[\/\s]/g, '-').toLowerCase();
     return safe === id || item.sourceTitleId === id || safe.includes(id) || id.includes(safe);
   });
 
-  if (match) {
-    realPagesData = await ApiService.getReaderPages(sourceId, match.sourceTitleId, chapter);
+  if (match && match.sourceTitleId && !targetTitleIds.includes(match.sourceTitleId)) {
+    targetTitleIds.push(match.sourceTitleId);
+  }
+
+  for (const titleId of targetTitleIds) {
+    for (const cand of candidates) {
+      const res = await ApiService.getReaderPages(sourceId, titleId, cand);
+      if (res && res.pages && res.pages.length > 0) {
+        realPagesData = res;
+        break;
+      }
+    }
+    if (realPagesData) break;
   }
 }
 
