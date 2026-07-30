@@ -55,32 +55,6 @@ const {
 		</div>
 
 		<div class="bar-right">
-			<!-- Chapter Selector -->
-			<select class="chapter-select" id="chapter-select">
-				{
-					chapters.map((ch) => (
-						<option
-							value={ch.id}
-							selected={ch.number === chapterNumber}
-						>
-							Ch. {ch.number}: {ch.title}
-						</option>
-					))
-				}
-			</select>
-
-			<!-- View Mode Selector -->
-			<select class="mode-select" id="reader-mode-select">
-				<option value="continuous">Continuous Scroll</option>
-				<option value="single">Single Page</option>
-				<option value="webtoon">Webtoon Mode</option>
-			</select>
-
-			<!-- Reading Direction Selector -->
-			<select class="dir-select" id="reader-dir-select">
-				<option value="ltr">LTR (Left to Right)</option>
-				<option value="rtl">RTL (Right to Left)</option>
-			</select>
 		</div>
 	</header>
 
