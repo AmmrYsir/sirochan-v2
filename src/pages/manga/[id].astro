@@ -1,19 +1,19 @@
 ---
-import MainLayout from "../../layouts/MainLayout.astro";
-import Button from "../../components/common/Button.astro";
-import Badge from "../../components/common/Badge.astro";
-import { ApiService } from "../../db/apiService";
+import MainLayout from '../../layouts/MainLayout.astro';
+import Button from '../../components/common/Button.astro';
+import Badge from '../../components/common/Badge.astro';
+import { ApiService } from '../../db/apiService';
 
 export async function getStaticPaths() {
 	try {
 		const sources = await ApiService.getSources();
 		const livePaths: Array<{ params: { id: string } }> = [];
 		for (const src of sources) {
-			if (src.type === "manga" || src.type === "dual") {
+			if (src.type === 'manga' || src.type === 'dual') {
 				const res = await ApiService.browseSource(src.id);
 				for (const item of res.items) {
-					const safeId = (item.sourceTitleId || "title")
-						.replace(/[\/\s]/g, "-")
+					const safeId = (item.sourceTitleId || 'title')
+						.replace(/[\/\s]/g, '-')
 						.toLowerCase();
 					livePaths.push({ params: { id: safeId } });
 				}
@@ -25,6 +25,36 @@ export async function getStaticPaths() {
 	}
 }
 
+function formatHumanDate(dateStr?: string | null): string | null {
+	if (
+		!dateStr ||
+		dateStr.trim() === '' ||
+		dateStr === 'JUST NOW' ||
+		dateStr === 'CLASSIC' ||
+		dateStr === '2026-07-30'
+	)
+		return null;
+	const d = new Date(dateStr);
+	if (isNaN(d.getTime())) return null;
+
+	const now = new Date();
+	const diffMs = now.getTime() - d.getTime();
+	const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+	const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+	if (diffHours >= 0 && diffHours < 1) return 'Just now';
+	if (diffHours >= 1 && diffHours < 24) return `${diffHours}h ago`;
+	if (diffDays >= 1 && diffDays < 7) return `${diffDays}d ago`;
+	if (diffDays >= 7 && diffDays < 30)
+		return `${Math.floor(diffDays / 7)}w ago`;
+
+	return d.toLocaleDateString('en-US', {
+		month: 'short',
+		day: 'numeric',
+		year: 'numeric',
+	});
+}
+
 const { id } = Astro.params;
 
 // Resolve real microservice data for this title!
@@ -33,7 +63,7 @@ let liveTitleDetails = null;
 if (id) {
 	const sources = await ApiService.getSources();
 	for (const src of sources) {
-		if (src.type === "manga" || src.type === "dual") {
+		if (src.type === 'manga' || src.type === 'dual') {
 			const details = await ApiService.getTitleDetails(src.id, id);
 			if (details) {
 				if (
@@ -53,9 +83,13 @@ if (id) {
 
 const rawDesc = liveTitleDetails?.description
 	? liveTitleDetails.description
-			.replace(/<[^>]*>/g, "")
+			.replace(/<[^>]*>/g, '')
 			.replace(/&[a-z0-9#]+;/gi, '"')
-	: "";
+	: '';
+
+const rawDate =
+	liveTitleDetails?.updatedAt || liveTitleDetails?.releasedAt || null;
+const humanDate = formatHumanDate(rawDate);
 
 const item = liveTitleDetails
 	? {
@@ -63,41 +97,41 @@ const item = liveTitleDetails
 			title: liveTitleDetails.title,
 			japaneseTitle:
 				liveTitleDetails.altTitles?.[0] || liveTitleDetails.title,
-			type: "manga" as const,
+			type: 'manga' as const,
 			coverImage:
 				liveTitleDetails.thumbnailUrl ||
-				"https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=600&q=80",
+				'https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=600&q=80',
 			bannerImage:
 				liveTitleDetails.thumbnailUrl ||
-				"https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=1600&q=80",
+				'https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=1600&q=80',
 			description:
 				rawDesc ||
-				"Live metadata title details fetched directly from microservice adapter.",
+				'Live metadata title details fetched directly from microservice adapter.',
 			rating: liveTitleDetails.rating || 4.8,
 			status: (liveTitleDetails.status?.toUpperCase() ||
-				"RELEASING") as any,
+				'RELEASING') as any,
 			genres:
 				liveTitleDetails.tags?.length > 0
 					? liveTitleDetails.tags
-					: ["Action", "Fantasy"],
+					: ['Action', 'Fantasy'],
 			latestChapterOrEpisode: `CH. ${liveTitleDetails.totalChapters || 1}`,
-			updatedAgo: liveTitleDetails.updatedAt || "JUST NOW",
+			humanDate: humanDate,
 		}
 	: {
-			id: id || "title",
-			title: id?.replace(/-/g, " ").toUpperCase() || "TITLE",
-			japaneseTitle: "",
-			type: "manga" as const,
+			id: id || 'title',
+			title: id?.replace(/-/g, ' ').toUpperCase() || 'TITLE',
+			japaneseTitle: '',
+			type: 'manga' as const,
 			coverImage:
-				"https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=600&q=80",
+				'https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=600&q=80',
 			bannerImage:
-				"https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=1600&q=80",
-			description: "Live title details from microservice.",
+				'https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=1600&q=80',
+			description: 'Live title details from microservice.',
 			rating: 4.8,
-			status: "RELEASING" as const,
-			genres: ["Manga"],
-			latestChapterOrEpisode: "CH. 1",
-			updatedAgo: "JUST NOW",
+			status: 'RELEASING' as const,
+			genres: ['Manga'],
+			latestChapterOrEpisode: 'CH. 1',
+			humanDate: null,
 		};
 
 const count =
@@ -109,9 +143,7 @@ const chapters = Array.from({ length: count }, (_, i) => ({
 	mediaId: item.id,
 	chapterNumber: count - i,
 	title: item.title,
-	totalPages: 24,
-	pages: [],
-	releaseDate: "2026-07-30",
+	humanDate: item.humanDate,
 }));
 ---
 
@@ -157,8 +189,13 @@ const chapters = Array.from({ length: count }, (_, i) => ({
 					<div class="meta-row">
 						<span class="rating-badge">★ {item.rating}</span>
 						<span class="meta-dot">•</span>
-						<span class="meta-mono">{chapters.length} CHAPTERS</span
-						>
+						<span class="meta-mono">{chapters.length} CHAPTERS</span>
+						{item.humanDate && (
+							<>
+								<span class="meta-dot">•</span>
+								<span class="meta-date">{item.humanDate}</span>
+							</>
+						)}
 					</div>
 
 					<div class="genre-tags">
@@ -175,13 +212,33 @@ const chapters = Array.from({ length: count }, (_, i) => ({
 
 			<!-- Chapter List -->
 			<section class="chapters-section">
-				<h2 class="section-title">CHAPTER LIST ({chapters.length})</h2>
-				<div class="chapters-stack">
+				<div class="chapters-header-row">
+					<h2 class="section-title">CHAPTER LIST ({chapters.length})</h2>
+					<div class="sort-segmented-control">
+						<span class="sort-icon-label">
+							<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="6" y1="12" x2="18" y2="12"/><line x1="9" y1="18" x2="15" y2="18"/></svg>
+							SORT
+						</span>
+						<div class="sort-pills-wrapper">
+							<button class="sort-pill active" data-sort="latest">
+								<span>Latest</span>
+								<svg class="sort-arrow-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+							</button>
+							<button class="sort-pill" data-sort="oldest">
+								<span>Oldest</span>
+								<svg class="sort-arrow-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="18 15 12 9 6 15"/></svg>
+							</button>
+						</div>
+					</div>
+				</div>
+
+				<div class="chapters-stack" id="chapters-container">
 					{
 						chapters.map((ch) => (
 							<a
 								href={`/manga/${item.id}/${ch.id}`}
 								class="chapter-row"
+								data-num={ch.chapterNumber}
 							>
 								<div class="ch-left">
 									<span class="ch-num">
@@ -189,7 +246,9 @@ const chapters = Array.from({ length: count }, (_, i) => ({
 									</span>
 									<span class="ch-title">{ch.title}</span>
 								</div>
-								<span class="ch-date">{ch.releaseDate}</span>
+								{ch.humanDate ? (
+									<span class="ch-date">{ch.humanDate}</span>
+								) : null}
 							</a>
 						))
 					}
@@ -198,6 +257,30 @@ const chapters = Array.from({ length: count }, (_, i) => ({
 		</div>
 	</div>
 </MainLayout>
+
+<script>
+	const sortBtns = document.querySelectorAll('.sort-pill');
+	const container = document.getElementById('chapters-container');
+
+	if (container) {
+		sortBtns.forEach((btn) => {
+			btn.addEventListener('click', () => {
+				const sort = btn.getAttribute('data-sort');
+				sortBtns.forEach((b) => b.classList.remove('active'));
+				btn.classList.add('active');
+
+				const rows = Array.from(container.children) as HTMLElement[];
+				rows.sort((a, b) => {
+					const numA = parseInt(a.getAttribute('data-num') || '0');
+					const numB = parseInt(b.getAttribute('data-num') || '0');
+					return sort === 'latest' ? numB - numA : numA - numB;
+				});
+
+				rows.forEach((row) => container.appendChild(row));
+			});
+		});
+	}
+</script>
 
 <style>
 	.detail-banner-wrapper {
@@ -240,7 +323,7 @@ const chapters = Array.from({ length: count }, (_, i) => ({
 
 	@media (min-width: 640px) {
 		.detail-grid {
-			grid-template-columns: 200px 1fr;
+			grid-template-columns: 240px 1fr;
 		}
 	}
 
@@ -300,7 +383,7 @@ const chapters = Array.from({ length: count }, (_, i) => ({
 		color: var(--text-dim);
 	}
 
-	.meta-mono {
+	.meta-mono, .meta-date {
 		font-family: var(--font-mono);
 		font-size: 0.8rem;
 		color: var(--text-muted);
@@ -334,6 +417,83 @@ const chapters = Array.from({ length: count }, (_, i) => ({
 		gap: 16px;
 	}
 
+	.chapters-header-row {
+		display: flex;
+		align-items: center;
+		justify-content: space-between;
+		border-bottom: 1px solid var(--border-subtle);
+		padding-bottom: 10px;
+	}
+
+	.sort-segmented-control {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		background-color: rgba(22, 22, 26, 0.75);
+		backdrop-filter: blur(12px);
+		border: 1px solid var(--border-subtle);
+		border-radius: var(--radius-full);
+		padding: 3px 4px 3px 12px;
+	}
+
+	.sort-icon-label {
+		display: flex;
+		align-items: center;
+		gap: 5px;
+		font-family: var(--font-mono);
+		font-size: 0.68rem;
+		font-weight: 700;
+		letter-spacing: 0.08em;
+		color: var(--text-muted);
+		text-transform: uppercase;
+	}
+
+	.sort-pills-wrapper {
+		display: flex;
+		align-items: center;
+		gap: 2px;
+		background-color: var(--bg-surface);
+		border-radius: var(--radius-full);
+		padding: 2px;
+		border: 1px solid rgba(255, 255, 255, 0.05);
+	}
+
+	.sort-pill {
+		display: flex;
+		align-items: center;
+		gap: 5px;
+		font-family: var(--font-body);
+		font-size: 0.76rem;
+		font-weight: 600;
+		padding: 4px 12px;
+		border-radius: var(--radius-full);
+		background: transparent;
+		border: none;
+		color: var(--text-muted);
+		cursor: pointer;
+		transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+	}
+
+	.sort-pill:hover {
+		color: #ffffff;
+		background-color: rgba(255, 255, 255, 0.06);
+	}
+
+	.sort-pill.active {
+		background-color: var(--accent-red);
+		color: #ffffff;
+		box-shadow: 0 2px 8px rgba(230, 57, 70, 0.4);
+	}
+
+	.sort-arrow-icon {
+		opacity: 0.7;
+		transition: transform 0.2s ease;
+	}
+
+	.sort-pill:hover .sort-arrow-icon {
+		opacity: 1;
+	}
+
 	.chapters-stack {
 		display: flex;
 		flex-direction: column;
@@ -344,7 +504,7 @@ const chapters = Array.from({ length: count }, (_, i) => ({
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
-		padding: 14px 16px;
+		padding: 12px 16px;
 		background-color: var(--bg-surface);
 		border: 1px solid var(--border-subtle);
 		border-radius: var(--radius-md);
@@ -365,15 +525,16 @@ const chapters = Array.from({ length: count }, (_, i) => ({
 
 	.ch-num {
 		font-family: var(--font-mono);
+		font-size: 0.82rem;
 		font-weight: 700;
 		color: var(--accent-red);
-		font-size: 0.85rem;
+
 	}
 
 	.ch-title {
+		font-size: 0.9rem;
 		font-weight: 600;
 		color: var(--text-primary);
-		font-size: 0.95rem;
 	}
 
 	.ch-date {

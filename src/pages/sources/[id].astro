@@ -13,6 +13,36 @@ export async function getStaticPaths() {
   }));
 }
 
+function formatHumanDate(dateStr?: string | null): string | null {
+  if (
+    !dateStr ||
+    dateStr.trim() === '' ||
+    dateStr === 'JUST NOW' ||
+    dateStr === 'CLASSIC' ||
+    dateStr === '2026-07-30'
+  )
+    return null;
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return null;
+
+  const now = new Date();
+  const diffMs = now.getTime() - d.getTime();
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  if (diffHours >= 0 && diffHours < 1) return 'Just now';
+  if (diffHours >= 1 && diffHours < 24) return `${diffHours}h ago`;
+  if (diffDays >= 1 && diffDays < 7) return `${diffDays}d ago`;
+  if (diffDays >= 7 && diffDays < 30)
+    return `${Math.floor(diffDays / 7)}w ago`;
+
+  return d.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+}
+
 const { id } = Astro.params;
 const allSources = await ApiService.getSources();
 const source = allSources.find(s => s.id === id) || allSources[0];
@@ -23,6 +53,9 @@ const liveItems = browseResult.items;
 
 const sourceMedia = liveItems.map(item => {
   const safeId = (item.sourceTitleId || 'title').replace(/[\/\s]/g, '-').toLowerCase();
+  const rawDate = item.updatedAt || item.releasedAt || null;
+  const humanDate = formatHumanDate(rawDate);
+
   return {
     id: safeId,
     title: item.title,
@@ -34,7 +67,7 @@ const sourceMedia = liveItems.map(item => {
     status: 'RELEASING' as const,
     genres: ['Action', 'Fantasy'],
     latestChapterOrEpisode: item.mediaType === 'manga' ? `CH. ${item.totalChapters || 100}` : `EP. ${item.totalEpisodes || 12}`,
-    updatedAgo: 'JUST NOW'
+    updatedAgo: humanDate || ''
   };
 });
 
@@ -42,11 +75,11 @@ const popularItems = sourceMedia.slice(0, 4);
 const genres = ['All', 'Action', 'Dark Fantasy', 'Sports', 'Drama', 'Sci-Fi', 'Supernatural'];
 ---
 
-<MainLayout title={`${source.name} - Sirochan Source Browser`} activeTab="discover">
-  <div class="source-browser-page container-constrained">
-    <!-- Breadcrumb Navigation -->
-    <nav class="breadcrumb-nav">
-      <a href="/discover" class="bc-link">Discover</a>
+<MainLayout title={`${source.name} Provider - Sirochan`} activeTab="discover">
+  <div class="source-dashboard container-constrained">
+    <!-- Top Breadcrumb -->
+    <nav class="breadcrumb">
+      <a href="/" class="bc-link">Home</a>
       <span class="bc-sep">/</span>
       <a href="/discover" class="bc-link">Sources</a>
       <span class="bc-sep">/</span>
@@ -74,47 +107,47 @@ const genres = ['All', 'Action', 'Dark Fantasy', 'Sports', 'Drama', 'Sci-Fi', 'S
           <div class="source-stats-row">
             <span class="stat-tag"><span class="ping-dot"></span> {source.status} ({source.pingMs}ms)</span>
             <span class="stat-sep">•</span>
-            <span class="stat-tag">{source.itemCount} CATALOG TITLES</span>
+            <span class="stat-tag">{source.itemCount} CATALOG ITEMS</span>
             <span class="stat-sep">•</span>
             <span class="stat-tag">LANG: {source.language}</span>
           </div>
         </div>
       </div>
 
-      <div class="masthead-actions">
-        <Button href="/discover" variant="secondary" size="md">
-          🔄 SWITCH SOURCE
+      <!-- Action Button Group -->
+      <div class="source-actions">
+        <Button variant="secondary" size="md" id="pin-btn">
+          📌 PIN TO QUICK ACCESS
         </Button>
-        <button class="pin-source-btn" id="pin-btn">
-          ★ PIN SOURCE
-        </button>
+        <a href={source.description?.match(/https?:\/\/[^\s]+/)?.[0] || '#'} target="_blank" rel="noopener noreferrer">
+          <Button variant="outline" size="md">
+            🌐 OPEN OFFICIAL WEB
+          </Button>
+        </a>
       </div>
     </div>
 
-    <!-- Catalog Search & Filter Bar -->
-    <div class="catalog-filter-bar">
-      <div class="search-box">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="search-icon">
-          <circle cx="11" cy="11" r="8"></circle>
-          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-        </svg>
-        <input type="text" placeholder={`Search inside ${source.name} catalog...`} class="search-input" id="catalog-search" />
+    <!-- Filter & Search Toolbar -->
+    <div class="catalog-toolbar">
+      <!-- Catalog Search Field -->
+      <div class="catalog-search-box">
+        <span class="search-icon">🔍</span>
+        <input 
+          type="text" 
+          id="catalog-search" 
+          placeholder={`Search ${source.name} catalog...`} 
+          class="catalog-search-input" 
+        />
       </div>
 
-      <div class="sort-select-wrapper">
-        <select class="sort-select" id="sort-select">
-          <option value="popular">Popularity ↓</option>
-          <option value="latest">Latest Updates</option>
-          <option value="rating">Highest Rated</option>
-        </select>
+      <!-- Genre Filter Pills -->
+      <div class="genre-filter-row">
+        {genres.map((g, idx) => (
+          <button class={`genre-chip ${idx === 0 ? 'active' : ''}`} data-genre={g}>
+            {g}
+          </button>
+        ))}
       </div>
-    </div>
-
-    <!-- Genre Chips Row -->
-    <div class="genre-row hide-scrollbar">
-      {genres.map((g, idx) => (
-        <button class={`genre-chip ${idx === 0 ? 'active' : ''}`}>{g}</button>
-      ))}
     </div>
 
     <!-- Popular on This Source Section -->
@@ -135,9 +168,26 @@ const genres = ['All', 'Action', 'Dark Fantasy', 'Sports', 'Drama', 'Sci-Fi', 'S
 
     <!-- Full Source Catalog Grid -->
     <section class="catalog-section">
-      <div class="section-header">
+      <div class="section-header-row">
         <h2 class="section-title">ALL CATALOG TITLES ({sourceMedia.length})</h2>
+        <div class="sort-segmented-control">
+          <span class="sort-icon-label">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="6" y1="12" x2="18" y2="12"/><line x1="9" y1="18" x2="15" y2="18"/></svg>
+            SORT
+          </span>
+          <div class="sort-pills-wrapper">
+            <button class="sort-pill active" data-sort="latest">
+              <span>Latest</span>
+              <svg class="sort-arrow-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            <button class="sort-pill" data-sort="oldest">
+              <span>Oldest</span>
+              <svg class="sort-arrow-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="18 15 12 9 6 15"/></svg>
+            </button>
+          </div>
+        </div>
       </div>
+
       <div class="media-grid" id="catalog-grid">
         {sourceMedia.map(item => (
           item.type === 'manga' ? (
@@ -155,84 +205,95 @@ const genres = ['All', 'Action', 'Dark Fantasy', 'Sports', 'Drama', 'Sci-Fi', 'S
   const searchInput = document.getElementById('catalog-search') as HTMLInputElement;
   const genreChips = document.querySelectorAll('.genre-chip');
   const mediaCards = document.querySelectorAll('.manga-card, .anime-card');
-  const pinBtn = document.getElementById('pin-btn');
+  const sortBtns = document.querySelectorAll('.sort-pill');
+  const gridContainer = document.getElementById('catalog-grid');
 
   let currentGenre = 'All';
-  let searchQuery = '';
+  let currentSearch = '';
 
   function filterCatalog() {
     mediaCards.forEach(card => {
-      const title = card.getAttribute('data-title') || '';
-      const genres = card.getAttribute('data-genres') || '';
+      const cardEl = card as HTMLElement;
+      const title = cardEl.querySelector('.card-title, .anime-card-title')?.textContent?.toLowerCase() || '';
 
-      const matchesSearch = !searchQuery || title.includes(searchQuery.toLowerCase());
-      const matchesGenre = currentGenre === 'All' || genres.includes(currentGenre.toLowerCase());
+      const matchesSearch = title.includes(currentSearch);
+      const matchesGenre = currentGenre === 'All';
 
       if (matchesSearch && matchesGenre) {
-        (card as HTMLElement).style.display = 'flex';
+        cardEl.style.display = 'flex';
       } else {
-        (card as HTMLElement).style.display = 'none';
+        cardEl.style.display = 'none';
       }
     });
   }
 
-  searchInput?.addEventListener('input', (e) => {
-    searchQuery = (e.target as HTMLInputElement).value;
-    filterCatalog();
-  });
+  if (searchInput) {
+    searchInput.addEventListener('input', (e) => {
+      currentSearch = (e.target as HTMLInputElement).value.toLowerCase().trim();
+      filterCatalog();
+    });
+  }
 
   genreChips.forEach(chip => {
     chip.addEventListener('click', () => {
       genreChips.forEach(c => c.classList.remove('active'));
       chip.classList.add('active');
-      currentGenre = chip.textContent?.trim() || 'All';
+      currentGenre = chip.getAttribute('data-genre') || 'All';
       filterCatalog();
     });
   });
 
-  pinBtn?.addEventListener('click', () => {
-    if (pinBtn.textContent?.includes('PINNED')) {
-      pinBtn.textContent = '★ PIN SOURCE';
-      pinBtn.classList.remove('pinned');
-    } else {
-      pinBtn.textContent = '★ PINNED';
-      pinBtn.classList.add('pinned');
-    }
-  });
+  if (gridContainer) {
+    sortBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const sort = btn.getAttribute('data-sort');
+        sortBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+
+        const cards = Array.from(gridContainer.children) as HTMLElement[];
+        cards.reverse();
+        cards.forEach(card => gridContainer.appendChild(card));
+      });
+    });
+  }
 </script>
 
 <style>
-  .source-browser-page {
-    padding-top: 16px;
+  .source-dashboard {
+    padding-top: 20px;
     display: flex;
     flex-direction: column;
-    gap: 24px;
+    gap: 32px;
   }
 
-  /* Breadcrumbs */
-  .breadcrumb-nav {
+  .breadcrumb {
     display: flex;
     align-items: center;
     gap: 8px;
     font-family: var(--font-mono);
-    font-size: 0.78rem;
+    font-size: 0.8rem;
+    color: var(--text-muted);
   }
 
   .bc-link {
     color: var(--text-muted);
+    text-decoration: none;
+    transition: color 0.2s ease;
   }
+
   .bc-link:hover {
-    color: var(--text-primary);
+    color: #ffffff;
   }
+
   .bc-sep {
     color: var(--text-dim);
   }
+
   .bc-current {
     color: var(--accent-red);
     font-weight: 700;
   }
 
-  /* Masthead */
   .source-masthead {
     display: flex;
     flex-direction: column;
@@ -295,8 +356,9 @@ const genres = ['All', 'Action', 'Dark Fantasy', 'Sports', 'Drama', 'Sci-Fi', 'S
   }
 
   .source-desc {
-    font-size: 0.9rem;
+    font-size: 0.88rem;
     color: var(--text-secondary);
+    max-width: 600px;
   }
 
   .source-stats-row {
@@ -306,7 +368,6 @@ const genres = ['All', 'Action', 'Dark Fantasy', 'Sports', 'Drama', 'Sci-Fi', 'S
     font-family: var(--font-mono);
     font-size: 0.75rem;
     color: var(--text-muted);
-    margin-top: 4px;
   }
 
   .ping-dot {
@@ -321,132 +382,174 @@ const genres = ['All', 'Action', 'Dark Fantasy', 'Sports', 'Drama', 'Sci-Fi', 'S
     color: var(--text-dim);
   }
 
-  .masthead-actions {
+  .source-actions {
     display: flex;
-    align-items: center;
     gap: 12px;
+    flex-wrap: wrap;
   }
 
-  .pin-source-btn {
-    font-family: var(--font-mono);
-    font-size: 0.8rem;
-    font-weight: 700;
-    padding: 10px 16px;
-    border-radius: var(--radius-md);
-    background-color: var(--bg-elevated);
-    color: #ffffff;
-    border: 1px solid var(--border-subtle);
-    cursor: pointer;
-    transition: all 0.2s ease;
-  }
-
-  .pin-source-btn:hover {
-    border-color: var(--accent-orange);
-    color: var(--accent-orange);
-  }
-
-  .pin-source-btn.pinned {
-    background-color: var(--accent-orange);
-    color: #000000;
-    border-color: var(--accent-orange);
-  }
-
-  /* Catalog Filter Bar */
-  .catalog-filter-bar {
+  .catalog-toolbar {
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 16px;
   }
 
-  @media (min-width: 640px) {
-    .catalog-filter-bar {
+  @media (min-width: 768px) {
+    .catalog-toolbar {
       flex-direction: row;
       align-items: center;
+      justify-content: space-between;
     }
   }
 
-  .search-box {
-    position: relative;
-    flex: 1;
-  }
-
-  .search-icon {
-    position: absolute;
-    left: 16px;
-    top: 50%;
-    transform: translateY(-50%);
-    color: var(--text-muted);
-  }
-
-  .search-input {
-    width: 100%;
-    height: 48px;
-    padding-left: 48px;
-    padding-right: 16px;
-    background-color: var(--bg-elevated);
+  .catalog-search-box {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background-color: var(--bg-surface);
     border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-lg);
+    border-radius: var(--radius-md);
+    padding: 8px 16px;
+    width: 100%;
+    max-width: 380px;
+  }
+
+  .catalog-search-box:focus-within {
+    border-color: var(--accent-red);
+  }
+
+  .catalog-search-input {
+    background: transparent;
+    border: none;
+    outline: none;
     color: #ffffff;
     font-family: var(--font-body);
-    font-size: 0.95rem;
-    outline: none;
+    font-size: 0.9rem;
+    width: 100%;
   }
 
-  .search-input:focus {
-    border-color: #ffffff;
-  }
-
-  .sort-select {
-    height: 48px;
-    padding: 0 16px;
-    background-color: var(--bg-elevated);
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-lg);
-    color: #ffffff;
-    font-family: var(--font-mono);
-    font-size: 0.85rem;
-    outline: none;
-    cursor: pointer;
-  }
-
-  .genre-row {
+  .genre-filter-row {
     display: flex;
     gap: 8px;
     overflow-x: auto;
-    padding-bottom: 8px;
+    padding-bottom: 4px;
   }
 
   .genre-chip {
     padding: 6px 14px;
     border-radius: var(--radius-full);
-    font-size: 0.8rem;
-    font-weight: 500;
-    white-space: nowrap;
-    background-color: var(--bg-elevated);
-    color: var(--text-muted);
+    background-color: var(--bg-surface);
     border: 1px solid var(--border-subtle);
+    color: var(--text-muted);
+    font-family: var(--font-body);
+    font-size: 0.8rem;
+    font-weight: 600;
     cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.2s ease;
   }
 
-  .genre-chip.active {
-    background-color: #ffffff;
-    color: #000000;
-    border-color: #ffffff;
-    font-weight: 700;
+  .genre-chip.active, .genre-chip:hover {
+    background-color: var(--bg-elevated);
+    color: #ffffff;
+    border-color: var(--text-muted);
   }
 
-  /* Catalog Sections */
   .catalog-section {
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 20px;
+  }
+
+  .section-header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border-subtle);
+    padding-bottom: 10px;
+  }
+
+  .section-title {
+    font-family: var(--font-hero);
+    font-size: 1.2rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+  }
+
+  .sort-segmented-control {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background-color: rgba(22, 22, 26, 0.75);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-full);
+    padding: 3px 4px 3px 12px;
+  }
+
+  .sort-icon-label {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    text-transform: uppercase;
+  }
+
+  .sort-pills-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    background-color: var(--bg-surface);
+    border-radius: var(--radius-full);
+    padding: 2px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  .sort-pill {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-family: var(--font-body);
+    font-size: 0.76rem;
+    font-weight: 600;
+    padding: 4px 12px;
+    border-radius: var(--radius-full);
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .sort-pill:hover {
+    color: #ffffff;
+    background-color: rgba(255, 255, 255, 0.06);
+  }
+
+  .sort-pill.active {
+    background-color: var(--accent-red);
+    color: #ffffff;
+    box-shadow: 0 2px 8px rgba(230, 57, 70, 0.4);
+  }
+
+  .sort-arrow-icon {
+    opacity: 0.7;
+    transition: transform 0.2s ease;
+  }
+
+  .sort-pill:hover .sort-arrow-icon {
+    opacity: 1;
   }
 
   .scroll-row {
     display: flex;
     gap: 16px;
     overflow-x: auto;
-    padding-bottom: 8px;
+    padding-bottom: 12px;
   }
 
   .media-grid {

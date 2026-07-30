@@ -23,6 +23,36 @@ export async function getStaticPaths() {
   }
 }
 
+function formatHumanDate(dateStr?: string | null): string | null {
+  if (
+    !dateStr ||
+    dateStr.trim() === '' ||
+    dateStr === 'JUST NOW' ||
+    dateStr === 'CLASSIC' ||
+    dateStr === '2026-07-30'
+  )
+    return null;
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return null;
+
+  const now = new Date();
+  const diffMs = now.getTime() - d.getTime();
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  if (diffHours >= 0 && diffHours < 1) return 'Just now';
+  if (diffHours >= 1 && diffHours < 24) return `${diffHours}h ago`;
+  if (diffDays >= 1 && diffDays < 7) return `${diffDays}d ago`;
+  if (diffDays >= 7 && diffDays < 30)
+    return `${Math.floor(diffDays / 7)}w ago`;
+
+  return d.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+}
+
 const { id } = Astro.params;
 
 // Resolve real microservice data for this title!
@@ -49,6 +79,9 @@ const rawDesc = liveTitleDetails?.description
   ? liveTitleDetails.description.replace(/<[^>]*>/g, '').replace(/&[a-z0-9#]+;/gi, '"')
   : '';
 
+const rawDate = liveTitleDetails?.updatedAt || liveTitleDetails?.releasedAt || null;
+const humanDate = formatHumanDate(rawDate);
+
 const item = liveTitleDetails ? {
   id: liveTitleDetails.sourceTitleId,
   title: liveTitleDetails.title,
@@ -61,7 +94,7 @@ const item = liveTitleDetails ? {
   status: (liveTitleDetails.status?.toUpperCase() || 'RELEASING') as any,
   genres: liveTitleDetails.tags?.length > 0 ? liveTitleDetails.tags : ['Action', 'Fantasy'],
   latestChapterOrEpisode: `EP. ${liveTitleDetails.totalEpisodes || 1}`,
-  updatedAgo: liveTitleDetails.updatedAt || 'JUST NOW'
+  humanDate: humanDate
 } : {
   id: id || 'title',
   title: id?.replace(/-/g, ' ').toUpperCase() || 'TITLE',
@@ -74,7 +107,7 @@ const item = liveTitleDetails ? {
   status: 'RELEASING' as const,
   genres: ['Anime'],
   latestChapterOrEpisode: 'EP. 1',
-  updatedAgo: 'JUST NOW'
+  humanDate: null
 };
 
 const count = liveTitleDetails?.totalEpisodes || liveTitleDetails?.contentSummary?.totalCount || 1;
@@ -83,11 +116,10 @@ const episodes = Array.from({ length: count }, (_, i) => ({
   mediaId: item.id,
   episodeNumber: i + 1,
   seasonNumber: 1,
-  title: `Episode ${i + 1}: ${item.title}`,
+  title: item.title,
   duration: '23:10',
-  timeMarker: '00:00',
-  videoUrl: '',
-  thumbnail: item.coverImage
+  thumbnail: item.coverImage,
+  humanDate: item.humanDate
 }));
 ---
 
@@ -119,6 +151,12 @@ const episodes = Array.from({ length: count }, (_, i) => ({
             <span class="rating-badge">★ {item.rating}</span>
             <span class="meta-dot">•</span>
             <span class="meta-mono">{episodes.length} EPISODES</span>
+            {item.humanDate && (
+              <>
+                <span class="meta-dot">•</span>
+                <span class="meta-date">{item.humanDate}</span>
+              </>
+            )}
           </div>
 
           <div class="genre-tags">
@@ -133,16 +171,38 @@ const episodes = Array.from({ length: count }, (_, i) => ({
 
       <!-- Episode List Grid -->
       <section class="episodes-section">
-        <h2 class="section-title">EPISODES ({episodes.length})</h2>
-        <div class="episodes-grid">
+        <div class="episodes-header-row">
+          <h2 class="section-title">EPISODES ({episodes.length})</h2>
+          <div class="sort-segmented-control">
+            <span class="sort-icon-label">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="6" y1="12" x2="18" y2="12"/><line x1="9" y1="18" x2="15" y2="18"/></svg>
+              SORT
+            </span>
+            <div class="sort-pills-wrapper">
+              <button class="sort-pill active" data-sort="latest">
+                <span>Latest</span>
+                <svg class="sort-arrow-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+              </button>
+              <button class="sort-pill" data-sort="oldest">
+                <span>Oldest</span>
+                <svg class="sort-arrow-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="18 15 12 9 6 15"/></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="episodes-grid" id="episodes-container">
           {episodes.map(ep => (
-            <a href={`/anime/${item.id}/${ep.id}`} class="ep-card">
+            <a href={`/anime/${item.id}/${ep.id}`} class="ep-card" data-num={ep.episodeNumber}>
               <div class="ep-thumb-wrapper">
                 <img src={ep.thumbnail} alt={ep.title} class="ep-thumb" />
                 <span class="ep-duration">{ep.duration}</span>
               </div>
               <div class="ep-info">
-                <span class="ep-num">EP. {ep.episodeNumber}</span>
+                <div class="ep-num-row">
+                  <span class="ep-num">EP. {ep.episodeNumber}</span>
+                  {ep.humanDate && <span class="ep-date">{ep.humanDate}</span>}
+                </div>
                 <h3 class="ep-title">{ep.title}</h3>
               </div>
             </a>
@@ -152,6 +212,30 @@ const episodes = Array.from({ length: count }, (_, i) => ({
     </div>
   </div>
 </MainLayout>
+
+<script>
+  const sortBtns = document.querySelectorAll('.sort-pill');
+  const container = document.getElementById('episodes-container');
+
+  if (container) {
+    sortBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const sort = btn.getAttribute('data-sort');
+        sortBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+
+        const cards = Array.from(container.children) as HTMLElement[];
+        cards.sort((a, b) => {
+          const numA = parseInt(a.getAttribute('data-num') || '0');
+          const numB = parseInt(b.getAttribute('data-num') || '0');
+          return sort === 'latest' ? numB - numA : numA - numB;
+        });
+
+        cards.forEach(card => container.appendChild(card));
+      });
+    });
+  }
+</script>
 
 <style>
   .detail-banner-wrapper {
@@ -250,7 +334,7 @@ const episodes = Array.from({ length: count }, (_, i) => ({
     color: var(--text-dim);
   }
 
-  .meta-mono {
+  .meta-mono, .meta-date {
     font-family: var(--font-mono);
     font-size: 0.8rem;
     color: var(--text-muted);
@@ -282,6 +366,83 @@ const episodes = Array.from({ length: count }, (_, i) => ({
     display: flex;
     flex-direction: column;
     gap: 16px;
+  }
+
+  .episodes-header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border-subtle);
+    padding-bottom: 10px;
+  }
+
+  .sort-segmented-control {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background-color: rgba(22, 22, 26, 0.75);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-full);
+    padding: 3px 4px 3px 12px;
+  }
+
+  .sort-icon-label {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    text-transform: uppercase;
+  }
+
+  .sort-pills-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    background-color: var(--bg-surface);
+    border-radius: var(--radius-full);
+    padding: 2px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  .sort-pill {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-family: var(--font-body);
+    font-size: 0.76rem;
+    font-weight: 600;
+    padding: 4px 12px;
+    border-radius: var(--radius-full);
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .sort-pill:hover {
+    color: #ffffff;
+    background-color: rgba(255, 255, 255, 0.06);
+  }
+
+  .sort-pill.active {
+    background-color: var(--accent-red);
+    color: #ffffff;
+    box-shadow: 0 2px 8px rgba(230, 57, 70, 0.4);
+  }
+
+  .sort-arrow-icon {
+    opacity: 0.7;
+    transition: transform 0.2s ease;
+  }
+
+  .sort-pill:hover .sort-arrow-icon {
+    opacity: 1;
   }
 
   .episodes-grid {
@@ -336,7 +497,13 @@ const episodes = Array.from({ length: count }, (_, i) => ({
   .ep-info {
     display: flex;
     flex-direction: column;
-    gap: 2px;
+    gap: 4px;
+  }
+
+  .ep-num-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
   }
 
   .ep-num {
@@ -344,6 +511,12 @@ const episodes = Array.from({ length: count }, (_, i) => ({
     font-size: 0.72rem;
     font-weight: 700;
     color: var(--accent-red);
+  }
+
+  .ep-date {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    color: var(--text-muted);
   }
 
   .ep-title {
