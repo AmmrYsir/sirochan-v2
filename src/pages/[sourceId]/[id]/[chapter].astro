@@ -1,33 +1,52 @@
 ---
 import MainLayout from '../../../layouts/MainLayout.astro';
 import MangaReader from '../../../components/reader/MangaReader.astro';
+import AnimePlayer from '../../../components/player/AnimePlayer.astro';
 import { ApiService } from '../../../db/apiService';
+import { ANIME_PLACEHOLDER } from '../../../utils/placeholders';
 
 
-const { sourceId, id, chapter } = Astro.params;
+const { sourceId = 'mangadex', id = 'title', chapter = 'ch-1' } = Astro.params;
 
-const chNum = chapter?.includes('-ch-') ? chapter.split('-ch-').pop() : (chapter?.includes('ch-') ? chapter.split('ch-').pop() : '1');
-const candidates: (string | undefined)[] = Array.from(new Set([
-  chapter,
-  chNum,
-  chNum ? `ch-${chNum}` : undefined,
-  chNum ? `chapter-${chNum}` : undefined,
-  undefined
-]));
+const VIDEO_SOURCES = ['spankbang', 'xvideos', 'xhamster', 'rule34world'];
 
-let realPagesData: any = null;
+// 1. Fetch title details or find matching catalog item
+let liveTitleDetails = await ApiService.getTitleDetails(sourceId, id);
+let actualSourceTitleId = id;
 
-if (sourceId && id) {
-  const targetTitleIds = [id];
+if (!liveTitleDetails) {
   const catalog = await ApiService.browseSource(sourceId);
   const match = catalog.items.find(item => {
     const safe = (item.sourceTitleId || 'title').replace(/[\/\s]/g, '-').toLowerCase();
     return safe === id || item.sourceTitleId === id || safe.includes(id) || id.includes(safe);
   });
-
-  if (match && match.sourceTitleId && !targetTitleIds.includes(match.sourceTitleId)) {
-    targetTitleIds.push(match.sourceTitleId);
+  if (match) {
+    actualSourceTitleId = match.sourceTitleId;
+    liveTitleDetails = await ApiService.getTitleDetails(sourceId, match.sourceTitleId);
   }
+}
+
+const isVideo = VIDEO_SOURCES.includes(sourceId.toLowerCase()) || liveTitleDetails?.mediaType === 'anime';
+
+let videoPlaybackData: any = null;
+let realPagesData: any = null;
+
+if (isVideo) {
+  // Fetch video stream details from microservice
+  videoPlaybackData = await ApiService.getPlaybackStream(sourceId, actualSourceTitleId);
+} else {
+  // Fetch manga reader pages
+  const chNum = chapter.includes('-ch-') ? chapter.split('-ch-').pop() : (chapter.includes('ch-') ? chapter.split('ch-').pop() : '1');
+  const candidates: (string | undefined)[] = Array.from(new Set([
+    chapter,
+    chNum,
+    chNum ? `ch-${chNum}` : undefined,
+    chNum ? `chapter-${chNum}` : undefined,
+    undefined
+  ]));
+
+  const targetTitleIds = [actualSourceTitleId];
+  if (id !== actualSourceTitleId) targetTitleIds.push(id);
 
   for (const titleId of targetTitleIds) {
     for (const cand of candidates) {
@@ -41,26 +60,38 @@ if (sourceId && id) {
   }
 }
 
-const item = {
-  id: id || 'title',
-  title: realPagesData?.title || id?.replace(/-/g, ' ').toUpperCase() || 'MANGA READER',
-  type: 'manga' as const
-};
+const title = videoPlaybackData?.title || liveTitleDetails?.title || id.replace(/-/g, ' ').toUpperCase();
+const streamUrl = videoPlaybackData?.streamUrl || '';
+const posterUrl = videoPlaybackData?.posterUrl || liveTitleDetails?.thumbnailUrl || ANIME_PLACEHOLDER;
 
 const pageUrls = realPagesData && realPagesData.pages.length > 0
   ? realPagesData.pages.map((p: any) => p.imageUrl)
   : [];
 
-const currentChNum = chapter?.includes('ch-') ? parseInt(chapter.split('ch-')[1]) : 1;
+const currentChNum = chapter.includes('ch-') ? parseInt(chapter.split('ch-')[1]) || 1 : 1;
 ---
 
-<MainLayout title={`${item.title} - Manga Reader`} hideNav={true}>
-  <MangaReader
-    mangaTitle={item.title}
-    chapterTitle={`Chapter ${currentChNum}`}
-    chapterNumber={currentChNum}
-    totalPages={pageUrls.length}
-    pages={pageUrls}
-    mangaId={item.id}
-  />
-</MainLayout>
+{isVideo ? (
+  <MainLayout title={`${title} - Video Player`} hideNav={true}>
+    <AnimePlayer
+      animeTitle={title}
+      episodeNumber={currentChNum}
+      episodeTitle="Full Stream HD"
+      videoUrl={streamUrl}
+      posterUrl={posterUrl}
+      animeId={actualSourceTitleId}
+      episodes={[{ id: chapter, number: 1, title: title, duration: 'HD Stream' }]}
+    />
+  </MainLayout>
+) : (
+  <MainLayout title={`${title} - Manga Reader`} hideNav={true}>
+    <MangaReader
+      mangaTitle={title}
+      chapterTitle={`Chapter ${currentChNum}`}
+      chapterNumber={currentChNum}
+      totalPages={pageUrls.length}
+      pages={pageUrls}
+      mangaId={actualSourceTitleId}
+    />
+  </MainLayout>
+)}

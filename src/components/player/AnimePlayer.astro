@@ -43,34 +43,14 @@ const {
     </div>
 
     <div class="header-right">
-      <select class="player-select" id="quality-select">
-        <option value="1080p" selected>1080p Full HD</option>
-        <option value="720p">720p HD</option>
-        <option value="480p">480p SD</option>
-        <option value="auto">Auto Adaptive</option>
-      </select>
-
-      <select class="player-select" id="subtitle-select">
-        <option value="en" selected>Subtitles: English</option>
-        <option value="jp">Subtitles: Japanese</option>
-        <option value="off">Subtitles: Off</option>
-      </select>
     </div>
   </header>
 
   <!-- Video Stage Container -->
   <div class="video-stage">
-    <video id="player-video" class="video-element" poster={posterUrl} src={videoUrl}>
+    <video id="player-video" class="video-element" poster={posterUrl} src={videoUrl} controls {...{ referrerpolicy: "no-referrer" }}>
       <track kind="captions" src="" srclang="en" label="English" default />
     </video>
-
-    <!-- Skip Intro Overlay Pill -->
-    <button class="skip-pill-btn skip-intro" id="skip-intro-btn">
-      SKIP INTRO (+85s) ⚡
-    </button>
-    <button class="skip-pill-btn skip-outro" id="skip-outro-btn">
-      SKIP OUTRO (+90s) ⚡
-    </button>
 
     <!-- Custom Player Overlay Controls -->
     <div class="player-controls-overlay">
