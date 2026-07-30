@@ -3,8 +3,10 @@ import MainLayout from '../layouts/MainLayout.astro';
 import MangaCard from '../components/media/MangaCard.astro';
 import AnimeCard from '../components/media/AnimeCard.astro';
 import Badge from '../components/common/Badge.astro';
-import { mockSources, mockMediaList } from '../db/mockData';
+import { ApiService } from '../db/apiService';
+import { mockMediaList } from '../db/mockData';
 
+const sources = await ApiService.getSources();
 const genres = ['All', 'Action', 'Dark Fantasy', 'Sports', 'Drama', 'Sci-Fi', 'Supernatural'];
 ---
 
@@ -21,7 +23,7 @@ const genres = ['All', 'Action', 'Dark Fantasy', 'Sports', 'Drama', 'Sci-Fi', 'S
       <div class="section-top-bar">
         <h2 class="section-title">CHOOSE PROVIDER SOURCE FIRST</h2>
         <div class="source-type-filter">
-          <button class="source-tab active" data-source-type="all">All ({mockSources.length})</button>
+          <button class="source-tab active" data-source-type="all">All ({sources.length})</button>
           <button class="source-tab" data-source-type="manga">Manga Providers</button>
           <button class="source-tab" data-source-type="anime">Anime Providers</button>
         </div>
@@ -29,7 +31,7 @@ const genres = ['All', 'Action', 'Dark Fantasy', 'Sports', 'Drama', 'Sci-Fi', 'S
 
       <!-- Sources Grid -->
       <div class="sources-grid">
-        {mockSources.map((src) => (
+        {sources.map((src) => (
           <a href={`/sources/${src.id}`} class="source-card" data-id={src.id} data-name={src.name} data-type={src.type}>
             <div class="source-card-header">
               <div class="source-brand">

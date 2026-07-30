@@ -4,19 +4,38 @@ import MangaCard from '../../components/media/MangaCard.astro';
 import AnimeCard from '../../components/media/AnimeCard.astro';
 import Badge from '../../components/common/Badge.astro';
 import Button from '../../components/common/Button.astro';
-import { mockSources, mockMediaList } from '../../db/mockData';
+import { ApiService } from '../../db/apiService';
+import { mockMediaList } from '../../db/mockData';
 
-export function getStaticPaths() {
-  return mockSources.map(src => ({
+export async function getStaticPaths() {
+  const sources = await ApiService.getSources();
+  return sources.map(src => ({
     params: { id: src.id }
   }));
 }
 
 const { id } = Astro.params;
-const source = mockSources.find(s => s.id === id) || mockSources[0];
+const allSources = await ApiService.getSources();
+const source = allSources.find(s => s.id === id) || allSources[0];
 
-// Media items associated with this source (or filtered by media type)
-const sourceMedia = mockMediaList.filter(m => m.type === source.type || source.type === 'dual');
+// Fetch live catalog items from http://localhost:8000 microservice!
+const browseResult = await ApiService.browseSource(source.id);
+const liveItems = browseResult.items;
+
+const sourceMedia = liveItems.length > 0 ? liveItems.map(item => ({
+  id: item.sourceTitleId,
+  title: item.title,
+  type: item.mediaType,
+  coverImage: item.thumbnailUrl || 'https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=600&q=80',
+  bannerImage: item.thumbnailUrl || 'https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=1600&q=80',
+  description: item.description || 'No description provided by source adapter.',
+  rating: item.rating || 4.8,
+  status: 'RELEASING' as const,
+  genres: ['Action', 'Fantasy'],
+  latestChapterOrEpisode: item.mediaType === 'manga' ? `CH. ${item.totalChapters || 100}` : `EP. ${item.totalEpisodes || 12}`,
+  updatedAgo: 'JUST NOW'
+})) : mockMediaList.filter(m => m.type === source.type || source.type === 'dual');
+
 const popularItems = sourceMedia.slice(0, 4);
 const genres = ['All', 'Action', 'Dark Fantasy', 'Sports', 'Drama', 'Sci-Fi', 'Supernatural'];
 ---
