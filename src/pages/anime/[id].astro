@@ -2,25 +2,91 @@
 import MainLayout from '../../layouts/MainLayout.astro';
 import Button from '../../components/common/Button.astro';
 import Badge from '../../components/common/Badge.astro';
-import { mockMediaList } from '../../db/mockData';
+import { ApiService } from '../../db/apiService';
 
-export function getStaticPaths() {
-  return mockMediaList
-    .filter(m => m.type === 'anime')
-    .map(item => ({ params: { id: item.id } }));
+export async function getStaticPaths() {
+  try {
+    const sources = await ApiService.getSources();
+    const livePaths: Array<{ params: { id: string } }> = [];
+    for (const src of sources) {
+      if (src.type === 'anime' || src.type === 'dual') {
+        const res = await ApiService.browseSource(src.id);
+        for (const item of res.items) {
+          const safeId = (item.sourceTitleId || 'title').replace(/[\/\s]/g, '-').toLowerCase();
+          livePaths.push({ params: { id: safeId } });
+        }
+      }
+    }
+    return livePaths;
+  } catch {
+    return [];
+  }
 }
 
 const { id } = Astro.params;
-const item = mockMediaList.find(m => m.id === id) || mockMediaList[3];
-const episodes = item.episodes || Array.from({ length: 12 }, (_, i) => ({
+
+// Resolve real microservice data for this title!
+let liveTitleDetails = null;
+
+if (id) {
+  const sources = await ApiService.getSources();
+  for (const src of sources) {
+    if (src.type === 'anime' || src.type === 'dual') {
+      const details = await ApiService.getTitleDetails(src.id, id);
+      if (details) {
+        if (!liveTitleDetails || details.thumbnailUrl || details.description) {
+          liveTitleDetails = details;
+          if (details.thumbnailUrl && details.description) {
+            break;
+          }
+        }
+      }
+    }
+  }
+}
+
+const rawDesc = liveTitleDetails?.description
+  ? liveTitleDetails.description.replace(/<[^>]*>/g, '').replace(/&[a-z0-9#]+;/gi, '"')
+  : '';
+
+const item = liveTitleDetails ? {
+  id: liveTitleDetails.sourceTitleId,
+  title: liveTitleDetails.title,
+  japaneseTitle: liveTitleDetails.altTitles?.[0] || liveTitleDetails.title,
+  type: 'anime' as const,
+  coverImage: liveTitleDetails.thumbnailUrl || 'https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=600&q=80',
+  bannerImage: liveTitleDetails.thumbnailUrl || 'https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=1600&q=80',
+  description: rawDesc || 'Live metadata title details fetched directly from microservice adapter.',
+  rating: liveTitleDetails.rating || 4.8,
+  status: (liveTitleDetails.status?.toUpperCase() || 'RELEASING') as any,
+  genres: liveTitleDetails.tags?.length > 0 ? liveTitleDetails.tags : ['Action', 'Fantasy'],
+  latestChapterOrEpisode: `EP. ${liveTitleDetails.totalEpisodes || 1}`,
+  updatedAgo: liveTitleDetails.updatedAt || 'JUST NOW'
+} : {
+  id: id || 'title',
+  title: id?.replace(/-/g, ' ').toUpperCase() || 'TITLE',
+  japaneseTitle: '',
+  type: 'anime' as const,
+  coverImage: 'https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=600&q=80',
+  bannerImage: 'https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=1600&q=80',
+  description: 'Live title details from microservice.',
+  rating: 4.8,
+  status: 'RELEASING' as const,
+  genres: ['Anime'],
+  latestChapterOrEpisode: 'EP. 1',
+  updatedAgo: 'JUST NOW'
+};
+
+const count = liveTitleDetails?.totalEpisodes || liveTitleDetails?.contentSummary?.totalCount || 1;
+const episodes = Array.from({ length: count }, (_, i) => ({
   id: `${item.id}-ep-${i + 1}`,
   mediaId: item.id,
   episodeNumber: i + 1,
   seasonNumber: 1,
-  title: `Episode ${i + 1}: The Unfolding Destiny`,
+  title: `Episode ${i + 1}: ${item.title}`,
   duration: '23:10',
   timeMarker: '00:00',
-  videoUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4',
+  videoUrl: '',
   thumbnail: item.coverImage
 }));
 ---

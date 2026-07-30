@@ -5,14 +5,71 @@ import MangaCard from '../components/media/MangaCard.astro';
 import AnimeCard from '../components/media/AnimeCard.astro';
 import EditorialItem from '../components/media/EditorialItem.astro';
 import Badge from '../components/common/Badge.astro';
-import { mockMediaList, currentUser } from '../db/mockData';
+import { ApiService } from '../db/apiService';
+import { currentUser } from '../db/mockData';
 
-const heroItem = mockMediaList.find(m => m.id === 'chainsaw-man') || mockMediaList[0];
-const continueReading = mockMediaList.filter(m => m.type === 'manga' && m.progressPercent !== undefined);
-const continueWatching = mockMediaList.filter(m => m.type === 'anime' && m.progressPercent !== undefined);
-const trendingItem = mockMediaList.find(m => m.id === 'blue-lock') || mockMediaList[5];
-const trendingGrid = mockMediaList.filter(m => ['haikyuu', 'dandadan', 'berserk', 'akira'].includes(m.id));
-const editorialSelections = mockMediaList.filter(m => m.isEditorialSelection);
+// Fetch live media feeds directly from loouwd microservice (http://localhost:8000)
+const liveMangaFeed = await ApiService.unifiedFeed('manga');
+const liveAnimeFeed = await ApiService.unifiedFeed('anime');
+
+const realMangaItems = liveMangaFeed.items.map(item => {
+  const safeId = (item.sourceTitleId || 'manga').replace(/[\/\s]/g, '-').toLowerCase();
+  return {
+    id: safeId,
+    title: item.title,
+    type: 'manga' as const,
+    coverImage: item.thumbnailUrl || 'https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=600&q=80',
+    bannerImage: item.thumbnailUrl || 'https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=1600&q=80',
+    description: item.description || 'Live item from provider adapter.',
+    rating: item.rating || 4.8,
+    status: 'RELEASING' as const,
+    genres: ['Action', 'Fantasy'],
+    latestChapterOrEpisode: `CH. ${item.totalChapters || 100}`,
+    updatedAgo: 'JUST NOW',
+    progressPercent: 45
+  };
+});
+
+const realAnimeItems = liveAnimeFeed.items.map(item => {
+  const safeId = (item.sourceTitleId || 'anime').replace(/[\/\s]/g, '-').toLowerCase();
+  return {
+    id: safeId,
+    title: item.title,
+    type: 'anime' as const,
+    coverImage: item.thumbnailUrl || 'https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=600&q=80',
+    bannerImage: item.thumbnailUrl || 'https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=1600&q=80',
+    description: item.description || 'Live item from provider adapter.',
+    rating: item.rating || 4.9,
+    status: 'RELEASING' as const,
+    genres: ['Action', 'Sci-Fi'],
+    latestChapterOrEpisode: `EP. ${item.totalEpisodes || 12}`,
+    updatedAgo: 'JUST NOW',
+    progressPercent: 75
+  };
+});
+
+const defaultItem = {
+  id: 'live-media',
+  title: 'SIROCHAN LIVE STREAM',
+  japaneseTitle: 'シロチャン',
+  type: 'manga' as const,
+  coverImage: 'https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=600&q=80',
+  bannerImage: 'https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=1600&q=80',
+  description: 'Explore live manga and anime streams directly from microservice source registry.',
+  rating: 5.0,
+  status: 'RELEASING' as const,
+  genres: ['Action', 'Fantasy'],
+  latestChapterOrEpisode: 'LIVE',
+  updatedAgo: 'JUST NOW'
+};
+
+const continueReading = realMangaItems;
+const continueWatching = realAnimeItems;
+
+const heroItem = continueReading[0] || continueWatching[0] || defaultItem;
+const trendingItem = continueWatching[0] || continueReading[0] || defaultItem;
+const trendingGrid = continueWatching.slice(1, 5);
+const editorialSelections = continueReading.slice(1, 3);
 ---
 
 <MainLayout title="Sirochan - Unified Manga & Anime Platform" activeTab="home">

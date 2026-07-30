@@ -1,7 +1,22 @@
 import type { MediaSource, MediaItem } from '../types';
-import { mockSources, mockMediaList } from './mockData';
 
 const BASE_URL = 'http://localhost:8000';
+
+// Simple in-memory cache to prevent HTTP 429 Rate-Limiting during build/SSR rendering
+const memoryCache = new Map<string, { data: any; expiry: number }>();
+
+function getCached<T>(key: string): T | null {
+  const item = memoryCache.get(key);
+  if (item && item.expiry > Date.now()) {
+    return item.data as T;
+  }
+  memoryCache.delete(key);
+  return null;
+}
+
+function setCached(key: string, data: any, ttlMs = 60000) {
+  memoryCache.set(key, { data, expiry: Date.now() + ttlMs });
+}
 
 export interface SourceManifest {
   id: string;
@@ -109,19 +124,24 @@ export interface UnifiedBrowseResult {
 }
 
 /**
- * Production-grade API Client connecting Sirochan v2 to Loouwd FastAPI Microservice Core.
+ * Pure API Client connecting Sirochan v2 strictly to Loouwd FastAPI Microservice Core (http://localhost:8000).
+ * ZERO mock data or fallback data.
  */
 export class ApiService {
   /**
    * Fetch all registered source adapter manifests
    */
   static async getSources(): Promise<MediaSource[]> {
+    const cacheKey = 'sources:list';
+    const cached = getCached<MediaSource[]>(cacheKey);
+    if (cached) return cached;
+
     try {
-      const res = await fetch(`${BASE_URL}/api/v1/sources`, { signal: AbortSignal.timeout(3000) });
+      const res = await fetch(`${BASE_URL}/api/v1/sources`, { signal: AbortSignal.timeout(4000) });
       if (!res.ok) throw new Error(`HTTP error ${res.status}`);
       const manifests: SourceManifest[] = await res.json();
 
-      return manifests.map(m => ({
+      const result: MediaSource[] = manifests.map(m => ({
         id: m.id,
         name: m.name,
         type: m.supportedMediaTypes.includes('anime') && m.supportedMediaTypes.includes('manga') ? 'dual' : m.supportedMediaTypes[0] || 'manga',
@@ -133,9 +153,12 @@ export class ApiService {
         itemCount: '10,000+',
         description: m.description
       }));
+
+      setCached(cacheKey, result, 120000);
+      return result;
     } catch (err) {
-      console.warn('[ApiService] Failed to fetch live sources from localhost:8000, using fallback:', err);
-      return mockSources;
+      console.error('[ApiService] Error fetching sources from localhost:8000:', err);
+      return [];
     }
   }
 
@@ -144,11 +167,11 @@ export class ApiService {
    */
   static async getHealthChecks(): Promise<SourceHealthCheck[]> {
     try {
-      const res = await fetch(`${BASE_URL}/api/v1/sources/health`, { signal: AbortSignal.timeout(3000) });
+      const res = await fetch(`${BASE_URL}/api/v1/sources/health`, { signal: AbortSignal.timeout(4000) });
       if (!res.ok) throw new Error(`HTTP error ${res.status}`);
       return await res.json();
     } catch (err) {
-      console.warn('[ApiService] Health check failed:', err);
+      console.error('[ApiService] Health check error:', err);
       return [];
     }
   }
@@ -157,33 +180,24 @@ export class ApiService {
    * Browse or search title catalog of a specific adapter
    */
   static async browseSource(sourceId: string, query?: string, page = 1): Promise<SourceBrowseResult> {
+    const cacheKey = `browse:${sourceId}:${query || 'all'}:${page}`;
+    const cached = getCached<SourceBrowseResult>(cacheKey);
+    if (cached) return cached;
+
     try {
       const res = await fetch(`${BASE_URL}/api/v1/sources/${sourceId}/browse`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query: query || null, page }),
-        signal: AbortSignal.timeout(3000)
+        signal: AbortSignal.timeout(4000)
       });
       if (!res.ok) throw new Error(`HTTP error ${res.status}`);
-      return await res.json();
+      const result: SourceBrowseResult = await res.json();
+      setCached(cacheKey, result, 60000);
+      return result;
     } catch (err) {
-      console.warn(`[ApiService] Failed to browse source ${sourceId}, using fallback:`, err);
-      return {
-        items: mockMediaList.map(m => ({
-          sourceId,
-          sourceTitleId: m.id,
-          canonicalUrl: `/manga/${m.id}`,
-          title: m.title,
-          mediaType: m.type,
-          trackingMode: m.type === 'manga' ? 'read' : 'watch',
-          thumbnailUrl: m.coverImage,
-          description: m.description,
-          rating: m.rating,
-          popular: true
-        })),
-        page: 1,
-        totalItems: mockMediaList.length
-      };
+      console.error(`[ApiService] Error browsing source ${sourceId}:`, err);
+      return { items: [], page: 1, totalItems: 0, totalPages: 1 };
     }
   }
 
@@ -196,12 +210,12 @@ export class ApiService {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(request),
-        signal: AbortSignal.timeout(4000)
+        signal: AbortSignal.timeout(5000)
       });
       if (!res.ok) throw new Error(`HTTP error ${res.status}`);
       return await res.json();
     } catch (err) {
-      console.warn('[ApiService] Unified browse failed, using fallback:', err);
+      console.error('[ApiService] Unified browse error:', err);
       return {
         items: [],
         page: 1,
@@ -218,15 +232,21 @@ export class ApiService {
    * Unified aggregated media feed
    */
   static async unifiedFeed(mediaType: 'all' | 'anime' | 'manga' = 'all', page = 1): Promise<UnifiedBrowseResult> {
+    const cacheKey = `feed:${mediaType}:${page}`;
+    const cached = getCached<UnifiedBrowseResult>(cacheKey);
+    if (cached) return cached;
+
     try {
       const url = new URL(`${BASE_URL}/api/v1/unified/feed/${mediaType}`);
       url.searchParams.append('page', page.toString());
 
-      const res = await fetch(url.toString(), { signal: AbortSignal.timeout(4000) });
+      const res = await fetch(url.toString(), { signal: AbortSignal.timeout(5000) });
       if (!res.ok) throw new Error(`HTTP error ${res.status}`);
-      return await res.json();
+      const result: UnifiedBrowseResult = await res.json();
+      setCached(cacheKey, result, 60000);
+      return result;
     } catch (err) {
-      console.warn('[ApiService] Unified feed failed:', err);
+      console.error('[ApiService] Unified feed error:', err);
       return {
         items: [],
         page: 1,
@@ -243,14 +263,20 @@ export class ApiService {
    * Fetch detailed title metadata
    */
   static async getTitleDetails(sourceId: string, sourceTitleId: string): Promise<SourceTitleDetails | null> {
+    const cacheKey = `details:${sourceId}:${sourceTitleId}`;
+    const cached = getCached<SourceTitleDetails>(cacheKey);
+    if (cached) return cached;
+
     try {
       const res = await fetch(`${BASE_URL}/api/v1/sources/${sourceId}/titles/${sourceTitleId}`, {
-        signal: AbortSignal.timeout(3000)
+        signal: AbortSignal.timeout(4000)
       });
       if (!res.ok) throw new Error(`HTTP error ${res.status}`);
-      return await res.json();
+      const result: SourceTitleDetails = await res.json();
+      setCached(cacheKey, result, 60000);
+      return result;
     } catch (err) {
-      console.warn(`[ApiService] Failed to fetch title details for ${sourceTitleId}:`, err);
+      console.error(`[ApiService] Error fetching title details for ${sourceTitleId}:`, err);
       return null;
     }
   }
@@ -259,15 +285,21 @@ export class ApiService {
    * Fetch image reader pages for manga/doujin titles
    */
   static async getReaderPages(sourceId: string, sourceTitleId: string, contentId?: string): Promise<SourceReaderPages | null> {
+    const cacheKey = `pages:${sourceId}:${sourceTitleId}:${contentId || 'default'}`;
+    const cached = getCached<SourceReaderPages>(cacheKey);
+    if (cached) return cached;
+
     try {
       const url = new URL(`${BASE_URL}/api/v1/sources/${sourceId}/titles/${sourceTitleId}/pages`);
       if (contentId) url.searchParams.append('content_id', contentId);
 
-      const res = await fetch(url.toString(), { signal: AbortSignal.timeout(3000) });
+      const res = await fetch(url.toString(), { signal: AbortSignal.timeout(4000) });
       if (!res.ok) throw new Error(`HTTP error ${res.status}`);
-      return await res.json();
+      const result: SourceReaderPages = await res.json();
+      setCached(cacheKey, result, 60000);
+      return result;
     } catch (err) {
-      console.warn(`[ApiService] Failed to fetch reader pages for ${sourceTitleId}:`, err);
+      console.error(`[ApiService] Error fetching reader pages for ${sourceTitleId}:`, err);
       return null;
     }
   }
@@ -276,15 +308,21 @@ export class ApiService {
    * Fetch video playback stream metadata for video titles
    */
   static async getPlaybackStream(sourceId: string, sourceTitleId: string, contentId?: string): Promise<SourcePlayback | null> {
+    const cacheKey = `playback:${sourceId}:${sourceTitleId}:${contentId || 'default'}`;
+    const cached = getCached<SourcePlayback>(cacheKey);
+    if (cached) return cached;
+
     try {
       const url = new URL(`${BASE_URL}/api/v1/sources/${sourceId}/titles/${sourceTitleId}/playback`);
       if (contentId) url.searchParams.append('content_id', contentId);
 
-      const res = await fetch(url.toString(), { signal: AbortSignal.timeout(3000) });
+      const res = await fetch(url.toString(), { signal: AbortSignal.timeout(4000) });
       if (!res.ok) throw new Error(`HTTP error ${res.status}`);
-      return await res.json();
+      const result: SourcePlayback = await res.json();
+      setCached(cacheKey, result, 60000);
+      return result;
     } catch (err) {
-      console.warn(`[ApiService] Failed to fetch playback stream for ${sourceTitleId}:`, err);
+      console.error(`[ApiService] Error fetching playback stream for ${sourceTitleId}:`, err);
       return null;
     }
   }

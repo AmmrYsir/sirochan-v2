@@ -4,9 +4,27 @@ import MangaCard from '../components/media/MangaCard.astro';
 import AnimeCard from '../components/media/AnimeCard.astro';
 import Badge from '../components/common/Badge.astro';
 import { ApiService } from '../db/apiService';
-import { mockMediaList } from '../db/mockData';
 
 const sources = await ApiService.getSources();
+const liveFeed = await ApiService.unifiedFeed('all');
+
+const mediaList = liveFeed.items.map(item => {
+  const safeId = (item.sourceTitleId || 'title').replace(/[\/\s]/g, '-').toLowerCase();
+  return {
+    id: safeId,
+    title: item.title,
+    type: item.mediaType,
+    coverImage: item.thumbnailUrl || 'https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=600&q=80',
+    bannerImage: item.thumbnailUrl || 'https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=1600&q=80',
+    description: item.description || 'Live title.',
+    rating: item.rating || 4.8,
+    status: 'RELEASING' as const,
+    genres: ['Action', 'Fantasy'],
+    latestChapterOrEpisode: item.mediaType === 'manga' ? `CH. ${item.totalChapters || 100}` : `EP. ${item.totalEpisodes || 12}`,
+    updatedAgo: 'JUST NOW'
+  };
+});
+
 const genres = ['All', 'Action', 'Dark Fantasy', 'Sports', 'Drama', 'Sci-Fi', 'Supernatural'];
 ---
 
@@ -92,7 +110,7 @@ const genres = ['All', 'Action', 'Dark Fantasy', 'Sports', 'Drama', 'Sci-Fi', 'S
 
       <!-- Media Grid from Selected Source -->
       <div class="media-grid" id="source-media-grid">
-        {mockMediaList.map(item => (
+        {mediaList.map(item => (
           item.type === 'manga' ? (
             <MangaCard item={item} />
           ) : (

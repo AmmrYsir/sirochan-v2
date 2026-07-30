@@ -2,10 +2,29 @@
 import MainLayout from '../layouts/MainLayout.astro';
 import MangaCard from '../components/media/MangaCard.astro';
 import AnimeCard from '../components/media/AnimeCard.astro';
-import { mockMediaList } from '../db/mockData';
+import { ApiService } from '../db/apiService';
 
-const continueMedia = mockMediaList.filter(m => m.progressPercent !== undefined);
-const bookmarkedMedia = mockMediaList.filter(m => m.trendingRank || m.rating >= 4.9);
+const liveFeed = await ApiService.unifiedFeed('all');
+
+const mediaList = liveFeed.items.map(item => {
+  const safeId = (item.sourceTitleId || 'title').replace(/[\/\s]/g, '-').toLowerCase();
+  return {
+    id: safeId,
+    title: item.title,
+    type: item.mediaType,
+    coverImage: item.thumbnailUrl || 'https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=600&q=80',
+    bannerImage: item.thumbnailUrl || 'https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=1600&q=80',
+    description: item.description || 'Saved library title.',
+    rating: item.rating || 4.8,
+    status: 'RELEASING' as const,
+    genres: ['Action', 'Fantasy'],
+    latestChapterOrEpisode: item.mediaType === 'manga' ? `CH. ${item.totalChapters || 100}` : `EP. ${item.totalEpisodes || 12}`,
+    updatedAgo: 'SAVED'
+  };
+});
+
+const continueMedia = mediaList.slice(0, 4);
+const bookmarkedMedia = mediaList.slice(4);
 ---
 
 <MainLayout title="My Library - Sirochan" activeTab="library">
