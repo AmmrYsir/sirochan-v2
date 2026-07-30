@@ -6,9 +6,10 @@ interface Props {
 }
 
 const { item } = Astro.props;
+const targetHref = item.sourceId ? `/${item.sourceId}/${item.id}` : `/anime/${item.id}`;
 ---
 
-<a href={`/anime/${item.id}`} class="anime-card" data-type="anime" data-title={item.title.toLowerCase()} data-genres={item.genres.join(',').toLowerCase()}>
+<a href={targetHref} class="anime-card" data-type="anime" data-title={item.title.toLowerCase()} data-genres={item.genres.join(',').toLowerCase()}>
   <div class="card-thumb-container">
     <img src={item.coverImage} alt={item.title} class="card-thumb" loading="lazy" />
     <div class="play-overlay">

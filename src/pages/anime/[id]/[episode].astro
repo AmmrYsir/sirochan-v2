@@ -33,7 +33,22 @@ if (id) {
   const sources = await ApiService.getSources();
   for (const src of sources) {
     if (src.type === 'anime' || src.type === 'dual') {
-      const playback = await ApiService.getPlaybackStream(src.id, id, episode);
+      // 1. Try direct fetch with URL id
+      let playback = await ApiService.getPlaybackStream(src.id, id, episode);
+
+      // 2. If direct fetch returned no stream, browse source to find matching raw sourceTitleId
+      if (!playback || !playback.streamUrl) {
+        const catalog = await ApiService.browseSource(src.id);
+        const match = catalog.items.find(item => {
+          const safe = (item.sourceTitleId || 'title').replace(/[\/\s]/g, '-').toLowerCase();
+          return safe === id || item.sourceTitleId === id || safe.includes(id) || id.includes(safe);
+        });
+
+        if (match) {
+          playback = await ApiService.getPlaybackStream(src.id, match.sourceTitleId, episode);
+        }
+      }
+
       if (playback && playback.streamUrl) {
         realPlaybackData = playback;
         break;

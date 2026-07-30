@@ -33,7 +33,22 @@ if (id) {
   const sources = await ApiService.getSources();
   for (const src of sources) {
     if (src.type === 'manga' || src.type === 'dual') {
-      const readerData = await ApiService.getReaderPages(src.id, id, chapter);
+      // 1. Try direct fetch with URL id
+      let readerData = await ApiService.getReaderPages(src.id, id, chapter);
+
+      // 2. If direct fetch returned no pages, browse source to find matching raw sourceTitleId
+      if (!readerData || !readerData.pages || readerData.pages.length === 0) {
+        const catalog = await ApiService.browseSource(src.id);
+        const match = catalog.items.find(item => {
+          const safe = (item.sourceTitleId || 'title').replace(/[\/\s]/g, '-').toLowerCase();
+          return safe === id || item.sourceTitleId === id || safe.includes(id) || id.includes(safe);
+        });
+
+        if (match) {
+          readerData = await ApiService.getReaderPages(src.id, match.sourceTitleId, chapter);
+        }
+      }
+
       if (readerData && readerData.pages && readerData.pages.length > 0) {
         realPagesData = readerData;
         break;

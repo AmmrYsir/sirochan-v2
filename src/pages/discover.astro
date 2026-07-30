@@ -12,6 +12,7 @@ const mediaList = liveFeed.items.map(item => {
   const safeId = (item.sourceTitleId || 'title').replace(/[\/\s]/g, '-').toLowerCase();
   return {
     id: safeId,
+    sourceId: item.sourceId,
     title: item.title,
     type: item.mediaType,
     coverImage: item.thumbnailUrl || 'https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=600&q=80',

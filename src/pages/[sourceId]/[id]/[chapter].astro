@@ -1,0 +1,67 @@
+---
+import MainLayout from '../../../layouts/MainLayout.astro';
+import MangaReader from '../../../components/reader/MangaReader.astro';
+import { ApiService } from '../../../db/apiService';
+
+export async function getStaticPaths() {
+  const paths: Array<{ params: { sourceId: string; id: string; chapter: string } }> = [];
+
+  try {
+    const sources = await ApiService.getSources();
+    for (const src of sources) {
+      if (src.type === 'manga' || src.type === 'dual') {
+        const res = await ApiService.browseSource(src.id);
+        for (const item of res.items) {
+          const safeId = (item.sourceTitleId || 'title').replace(/[\/\s]/g, '-').toLowerCase();
+          paths.push({ params: { sourceId: src.id, id: safeId, chapter: `${safeId}-ch-1` } });
+        }
+      }
+    }
+  } catch {
+    // fallback
+  }
+
+  return paths;
+}
+
+const { sourceId, id, chapter } = Astro.params;
+
+// Direct 1-shot API call to microservice reader pages!
+let realPagesData = await ApiService.getReaderPages(sourceId, id, chapter);
+
+// Fallback if URL slug differs from raw sourceTitleId
+if (!realPagesData || !realPagesData.pages || realPagesData.pages.length === 0) {
+  const catalog = await ApiService.browseSource(sourceId);
+  const match = catalog.items.find(item => {
+    const safe = (item.sourceTitleId || 'title').replace(/[\/\s]/g, '-').toLowerCase();
+    return safe === id || item.sourceTitleId === id || safe.includes(id) || id.includes(safe);
+  });
+
+  if (match) {
+    realPagesData = await ApiService.getReaderPages(sourceId, match.sourceTitleId, chapter);
+  }
+}
+
+const item = {
+  id: id || 'title',
+  title: realPagesData?.title || id?.replace(/-/g, ' ').toUpperCase() || 'MANGA READER',
+  type: 'manga' as const
+};
+
+const pageUrls = realPagesData && realPagesData.pages.length > 0
+  ? realPagesData.pages.map(p => p.imageUrl)
+  : [];
+
+const currentChNum = chapter?.includes('ch-') ? parseInt(chapter.split('ch-')[1]) : 1;
+---
+
+<MainLayout title={`${item.title} - Manga Reader`} hideNav={true}>
+  <MangaReader
+    mangaTitle={item.title}
+    chapterTitle={`Chapter ${currentChNum}`}
+    chapterNumber={currentChNum}
+    totalPages={pageUrls.length}
+    pages={pageUrls}
+    mangaId={item.id}
+  />
+</MainLayout>
