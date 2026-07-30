@@ -21,10 +21,10 @@ const { item } = Astro.props;
       <p class="hero-desc">{item.description}</p>
       
       <div class="hero-actions">
-        <Button href={`/manga/${item.id}/csm-ch-165`} variant="primary" size="md">
+        <Button href={`/${item.sourceId || 'mangadex'}/${item.id}/${item.id}-ch-1`} variant="primary" size="md">
           READ NOW
         </Button>
-        <Button href={`/manga/${item.id}`} variant="secondary" size="md">
+        <Button href={`/${item.sourceId || 'mangadex'}/${item.id}`} variant="secondary" size="md">
           DETAILS
         </Button>
       </div>

@@ -31,7 +31,7 @@ const {
   <!-- Header Bar -->
   <header class="player-header">
     <div class="header-left">
-      <a href={`/anime/${animeId}`} class="icon-btn" aria-label="Back to Anime Details">
+      <a href="javascript:history.back()" class="icon-btn" aria-label="Back to Anime Details">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <polyline points="15 18 9 12 15 6"></polyline>
         </svg>
@@ -129,7 +129,7 @@ const {
       {episodes.map(ep => {
         const isCurrent = ep.number === episodeNumber;
         return (
-          <a href={`/anime/${animeId}/sl-ep-${ep.number}`} class={`ep-item-card ${isCurrent ? 'active' : ''}`}>
+          <a href={`?ep=${ep.number}`} class={`ep-item-card ${isCurrent ? 'active' : ''}`}>
             <span class="ep-badge">EP. {ep.number}</span>
             <span class="ep-title">{ep.title}</span>
             <span class="ep-dur">{ep.duration}</span>

@@ -8,7 +8,7 @@ interface Props {
 const { item } = Astro.props;
 ---
 
-<a href={`/manga/${item.id}`} class="editorial-item">
+<a href={`/${item.sourceId || 'mangadex'}/${item.id}`} class="editorial-item">
   <div class="editorial-header">
     <h3 class="editorial-title">{item.title}</h3>
   </div>

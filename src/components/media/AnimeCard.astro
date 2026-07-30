@@ -5,8 +5,7 @@ interface Props {
   item: MediaItem;
 }
 
-const { item } = Astro.props;
-const targetHref = item.sourceId ? `/${item.sourceId}/${item.id}` : `/anime/${item.id}`;
+const targetHref = `/${item.sourceId || 'hianime'}/${item.id}`;
 ---
 
 <a href={targetHref} class="anime-card" data-type="anime" data-title={item.title.toLowerCase()} data-genres={item.genres.join(',').toLowerCase()}>
