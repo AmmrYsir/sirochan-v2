@@ -49,6 +49,8 @@ export interface SourceBrowseItem {
   popular?: boolean;
   totalEpisodes?: number;
   totalChapters?: number;
+  genres?: string[];
+  tags?: string[];
   updatedAt?: string;
   releasedAt?: string;
 }

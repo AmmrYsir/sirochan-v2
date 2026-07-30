@@ -13,6 +13,7 @@ const allItems = browseResults.flatMap(res => res.items);
 
 const mediaList = allItems.map(item => {
   const safeId = (item.sourceTitleId || 'title').replace(/[\/\s]/g, '-').toLowerCase();
+  const itemGenres = item.genres || item.tags || [item.mediaType.toUpperCase()];
   return {
     id: safeId,
     sourceId: item.sourceId,
@@ -23,13 +24,14 @@ const mediaList = allItems.map(item => {
     description: item.description || 'Live title.',
     rating: item.rating || 4.8,
     status: 'RELEASING' as const,
-    genres: ['Action', 'Fantasy'],
+    genres: itemGenres,
     latestChapterOrEpisode: item.mediaType === 'manga' ? `CH. ${item.totalChapters || 100}` : `EP. ${item.totalEpisodes || 12}`,
     updatedAgo: 'JUST NOW'
   };
 });
 
-const genres = ['All', 'Action', 'Dark Fantasy', 'Sports', 'Drama', 'Sci-Fi', 'Supernatural'];
+const rawGenres = mediaList.flatMap(m => m.genres || []);
+const genres = ['All', ...Array.from(new Set(rawGenres)).filter(Boolean).sort()];
 ---
 
 <MainLayout title="Discover Sources - Sirochan" activeTab="discover">

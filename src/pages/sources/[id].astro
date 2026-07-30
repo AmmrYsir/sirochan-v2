@@ -5,6 +5,7 @@ import AnimeCard from '../../components/media/AnimeCard.astro';
 import Badge from '../../components/common/Badge.astro';
 import Button from '../../components/common/Button.astro';
 import { ApiService } from '../../db/apiService';
+import { MANGA_PLACEHOLDER, ANIME_PLACEHOLDER } from '../../utils/placeholders';
 
 
 function formatHumanDate(dateStr?: string | null): string | null {
@@ -49,25 +50,27 @@ const sourceMedia = liveItems.map(item => {
   const safeId = (item.sourceTitleId || 'title').replace(/[\/\s]/g, '-').toLowerCase();
   const rawDate = item.updatedAt || item.releasedAt || null;
   const humanDate = formatHumanDate(rawDate);
+  const itemGenres = item.genres || item.tags || [item.mediaType.toUpperCase()];
 
   return {
     id: safeId,
     sourceId: item.sourceId || source.id,
     title: item.title,
     type: item.mediaType,
-    coverImage: item.thumbnailUrl || 'https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=600&q=80',
-    bannerImage: item.thumbnailUrl || 'https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=1600&q=80',
+    coverImage: item.thumbnailUrl || MANGA_PLACEHOLDER,
+    bannerImage: item.thumbnailUrl || ANIME_PLACEHOLDER,
     description: item.description || 'No description provided by source adapter.',
     rating: item.rating || 4.8,
     status: 'RELEASING' as const,
-    genres: ['Action', 'Fantasy'],
+    genres: itemGenres,
     latestChapterOrEpisode: item.mediaType === 'manga' ? `CH. ${item.totalChapters || 100}` : `EP. ${item.totalEpisodes || 12}`,
     updatedAgo: humanDate || ''
   };
 });
 
 const popularItems = sourceMedia.slice(0, 4);
-const genres = ['All', 'Action', 'Dark Fantasy', 'Sports', 'Drama', 'Sci-Fi', 'Supernatural'];
+const rawGenres = sourceMedia.flatMap(m => m.genres || []);
+const genres = ['All', ...Array.from(new Set(rawGenres)).filter(Boolean).sort()];
 ---
 
 <MainLayout title={`${source.name} Provider - Sirochan`} activeTab="discover">
