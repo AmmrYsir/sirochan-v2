@@ -48,7 +48,7 @@ const item = {
 };
 
 const pageUrls = realPagesData && realPagesData.pages.length > 0
-  ? realPagesData.pages.map(p => p.imageUrl)
+  ? realPagesData.pages.map((p: any) => p.imageUrl)
   : [];
 
 const currentChNum = chapter?.includes('ch-') ? parseInt(chapter.split('ch-')[1]) : 1;

@@ -23,7 +23,8 @@ function formatHumanDate(dateStr?: string | null): string | null {
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
-const { sourceId, id } = Astro.params;
+const sourceId = Astro.params.sourceId || 'mangadex';
+const id = Astro.params.id || 'title';
 
 // Direct 1-shot API call to microservice adapter!
 let liveTitleDetails = await ApiService.getTitleDetails(sourceId, id);

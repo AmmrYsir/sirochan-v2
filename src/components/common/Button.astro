@@ -1,16 +1,17 @@
 ---
 interface Props {
-  variant?: 'primary' | 'secondary' | 'ghost';
+  variant?: 'primary' | 'secondary' | 'ghost' | 'outline';
   size?: 'sm' | 'md' | 'lg';
   href?: string;
+  id?: string;
   class?: string;
 }
 
-const { variant = 'primary', size = 'md', href, class: className = '' } = Astro.props;
+const { variant = 'primary', size = 'md', href, id, class: className = '' } = Astro.props;
 const Component = href ? 'a' : 'button';
 ---
 
-<Component href={href} class={`btn btn-${variant} btn-${size} ${className}`}>
+<Component id={id} href={href} class={`btn btn-${variant} btn-${size} ${className}`}>
   <slot />
 </Component>
 

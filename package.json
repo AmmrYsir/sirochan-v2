@@ -15,12 +15,15 @@
     "db:migrate": "drizzle-kit migrate"
   },
   "dependencies": {
+    "@astrojs/check": "^0.9.10",
     "@astrojs/node": "^11.0.3",
     "astro": "^7.1.6",
     "drizzle-orm": "^0.45.2",
-    "postgres": "^3.4.9"
+    "postgres": "^3.4.9",
+    "typescript": "~5.7.3"
   },
   "devDependencies": {
+    "@types/node": "^26.1.2",
     "drizzle-kit": "^0.31.10"
   }
 }

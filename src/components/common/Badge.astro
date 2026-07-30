@@ -1,13 +1,14 @@
 ---
 interface Props {
   variant?: 'red' | 'orange' | 'dark' | 'outline';
+  id?: string;
   class?: string;
 }
 
-const { variant = 'red', class: className = '' } = Astro.props;
+const { variant = 'red', id, class: className = '' } = Astro.props;
 ---
 
-<span class={`badge badge-${variant} ${className}`}>
+<span id={id} class={`badge badge-${variant} ${className}`}>
   <slot />
 </span>
 

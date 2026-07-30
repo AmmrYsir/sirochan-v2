@@ -5,6 +5,7 @@ interface Props {
   item: MediaItem;
 }
 
+const { item } = Astro.props;
 const targetHref = `/${item.sourceId || 'mangadex'}/${item.id}`;
 ---
 
