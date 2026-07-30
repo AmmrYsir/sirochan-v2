@@ -3,26 +3,6 @@ import MainLayout from '../../../layouts/MainLayout.astro';
 import AnimePlayer from '../../../components/player/AnimePlayer.astro';
 import { ApiService } from '../../../db/apiService';
 
-export async function getStaticPaths() {
-  const paths: Array<{ params: { id: string; episode: string } }> = [];
-
-  try {
-    const sources = await ApiService.getSources();
-    for (const src of sources) {
-      if (src.type === 'anime' || src.type === 'dual') {
-        const res = await ApiService.browseSource(src.id);
-        for (const item of res.items) {
-          const safeId = (item.sourceTitleId || 'title').replace(/[\/\s]/g, '-').toLowerCase();
-          paths.push({ params: { id: safeId, episode: `${safeId}-ep-1` } });
-        }
-      }
-    }
-  } catch {
-    // fallback
-  }
-
-  return paths;
-}
 
 const { id, episode } = Astro.params;
 

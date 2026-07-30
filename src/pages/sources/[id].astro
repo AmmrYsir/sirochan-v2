@@ -6,12 +6,6 @@ import Badge from '../../components/common/Badge.astro';
 import Button from '../../components/common/Button.astro';
 import { ApiService } from '../../db/apiService';
 
-export async function getStaticPaths() {
-  const sources = await ApiService.getSources();
-  return sources.map(src => ({
-    params: { id: src.id }
-  }));
-}
 
 function formatHumanDate(dateStr?: string | null): string | null {
   if (

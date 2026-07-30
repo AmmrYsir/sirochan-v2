@@ -4,22 +4,6 @@ import Button from '../../components/common/Button.astro';
 import Badge from '../../components/common/Badge.astro';
 import { ApiService } from '../../db/apiService';
 
-export async function getStaticPaths() {
-  try {
-    const sources = await ApiService.getSources();
-    const paths: Array<{ params: { sourceId: string; id: string } }> = [];
-    for (const src of sources) {
-      const res = await ApiService.browseSource(src.id);
-      for (const item of res.items) {
-        const safeId = (item.sourceTitleId || 'title').replace(/[\/\s]/g, '-').toLowerCase();
-        paths.push({ params: { sourceId: src.id, id: safeId } });
-      }
-    }
-    return paths;
-  } catch {
-    return [];
-  }
-}
 
 function formatHumanDate(dateStr?: string | null): string | null {
   if (!dateStr || dateStr.trim() === '' || dateStr === 'JUST NOW' || dateStr === 'CLASSIC' || dateStr === '2026-07-30') return null;
