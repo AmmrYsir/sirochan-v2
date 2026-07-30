@@ -53,7 +53,13 @@ const genres = ['All', 'Action', 'Dark Fantasy', 'Sports', 'Drama', 'Sci-Fi', 'S
           <a href={`/sources/${src.id}`} class="source-card" data-id={src.id} data-name={src.name} data-type={src.type}>
             <div class="source-card-header">
               <div class="source-brand">
-                <span class="source-icon">{src.icon}</span>
+                <span class="source-icon">
+                  {src.icon && (src.icon.startsWith('http') || src.icon.startsWith('/')) ? (
+                    <img src={src.icon} alt={src.name} class="source-img-icon" onerror="this.style.display='none';" />
+                  ) : (
+                    <span>{src.icon || '⚡'}</span>
+                  )}
+                </span>
                 <div class="source-titles">
                   <h3 class="source-name">{src.name}</h3>
                   <span class="source-meta">{src.itemCount} TITLES • {src.language}</span>
@@ -336,6 +342,16 @@ const genres = ['All', 'Action', 'Dark Fantasy', 'Sports', 'Drama', 'Sci-Fi', 'S
   .source-icon {
     font-size: 1.8rem;
     line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .source-img-icon {
+    width: 36px;
+    height: 36px;
+    object-fit: contain;
+    border-radius: var(--radius-sm);
   }
 
   .source-titles {

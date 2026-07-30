@@ -56,7 +56,13 @@ const genres = ['All', 'Action', 'Dark Fantasy', 'Sports', 'Drama', 'Sci-Fi', 'S
     <!-- Source Provider Masthead Banner -->
     <div class="source-masthead">
       <div class="masthead-main">
-        <div class="source-avatar-icon">{source.icon}</div>
+        <div class="source-avatar-icon">
+          {source.icon && (source.icon.startsWith('http') || source.icon.startsWith('/')) ? (
+            <img src={source.icon} alt={source.name} class="source-masthead-img-icon" onerror="this.style.display='none';" />
+          ) : (
+            <span>{source.icon || '⚡'}</span>
+          )}
+        </div>
         <div class="source-masthead-info">
           <div class="source-title-row">
             <h1 class="source-title">{source.name}</h1>
@@ -258,6 +264,16 @@ const genres = ['All', 'Action', 'Dark Fantasy', 'Sports', 'Drama', 'Sci-Fi', 'S
     background-color: var(--bg-elevated);
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .source-masthead-img-icon {
+    width: 42px;
+    height: 42px;
+    object-fit: contain;
+    border-radius: var(--radius-sm);
   }
 
   .source-masthead-info {
