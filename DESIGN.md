@@ -163,7 +163,7 @@ The system operates on a **Dark Mode First** logic. The palette is intentionally
 
 ### Bottom Navigation Bar (Mobile / Touch Devices)
 The fixed bottom navigation consists strictly of **4 core sections**:
-1. **Home (`/`):** Unified media feed featuring Hero Showcase, User Greeting ("Good evening, Arata"), Continue Reading (3:4 cards), Continue Watching (16:9 cards), Trending Spotlight, 2x2 Media Grid, and Curated Editorials.
+1. **Home (`/`):** Media feed featuring Hero Showcase, User Greeting ("Good evening, Arata"), Continue Reading (3:4 cards), Continue Watching (16:9 cards), Trending Spotlight, 2x2 Media Grid, and Curated Editorials.
 2. **Discover (`/discover`):** Live search, media type toggle (*All*, *Manga*, *Anime*), and genre filter chips (*Action*, *Dark Fantasy*, *Sports*, *Drama*, *Sci-Fi*, *Supernatural*).
 3. **Library (`/library`):** Filter tabs for *In Progress*, *Bookmarks*, *Favorites*, and *History*.
 4. **Profile (`/profile`):** User stats (Chapters Read, Hours Watched, Day Streak) and settings (Reader mode: Single vs Continuous, Stream default: 1080p HD).

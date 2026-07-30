@@ -4,9 +4,13 @@ import MangaCard from '../components/media/MangaCard.astro';
 import AnimeCard from '../components/media/AnimeCard.astro';
 import { ApiService } from '../db/apiService';
 
-const liveFeed = await ApiService.unifiedFeed('all');
+const sources = await ApiService.getSources();
+const browseResults = await Promise.all(
+  sources.map(src => ApiService.browseSource(src.id))
+);
+const allItems = browseResults.flatMap(res => res.items);
 
-const mediaList = liveFeed.items.map(item => {
+const mediaList = allItems.map(item => {
   const safeId = (item.sourceTitleId || 'title').replace(/[\/\s]/g, '-').toLowerCase();
   return {
     id: safeId,
