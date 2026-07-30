@@ -1,0 +1,228 @@
+---
+import MainLayout from '../layouts/MainLayout.astro';
+import Button from '../components/common/Button.astro';
+import { currentUser } from '../db/mockData';
+---
+
+<MainLayout title="Profile - Sirochan" activeTab="profile">
+  <div class="profile-page container-constrained">
+    <!-- User Card -->
+    <div class="user-header-card">
+      <img src={currentUser.avatar} alt={currentUser.username} class="avatar" />
+      <div class="user-info">
+        <h1 class="user-name">{currentUser.username}</h1>
+        <p class="user-handle">{currentUser.handle}</p>
+        <span class="member-badge">PRO MEMBER</span>
+      </div>
+    </div>
+
+    <!-- Stats Dashboard Grid -->
+    <div class="stats-grid">
+      <div class="stat-box">
+        <span class="stat-value">{currentUser.chaptersRead}</span>
+        <span class="stat-label">Chapters Read</span>
+      </div>
+      <div class="stat-box">
+        <span class="stat-value">{currentUser.hoursWatched}h</span>
+        <span class="stat-label">Hours Watched</span>
+      </div>
+      <div class="stat-box">
+        <span class="stat-value">{currentUser.readingStreakDays} 🔥</span>
+        <span class="stat-label">Day Streak</span>
+      </div>
+    </div>
+
+    <!-- Settings Group -->
+    <div class="settings-group">
+      <h2 class="settings-title">APP PREFERENCES</h2>
+
+      <div class="setting-row">
+        <div class="setting-info">
+          <span class="setting-name">Default Reader Mode</span>
+          <span class="setting-desc">Single Page vs Continuous Scroll</span>
+        </div>
+        <select class="setting-select">
+          <option value="continuous" selected={currentUser.preferredReaderMode === 'continuous'}>Continuous Scroll</option>
+          <option value="single" selected={currentUser.preferredReaderMode === 'single'}>Single Page</option>
+        </select>
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-info">
+          <span class="setting-name">Anime Stream Quality</span>
+          <span class="setting-desc">Preferred streaming resolution</span>
+        </div>
+        <select class="setting-select">
+          <option value="1080p" selected={currentUser.preferredStreamQuality === '1080p'}>1080p Full HD</option>
+          <option value="720p" selected={currentUser.preferredStreamQuality === '720p'}>720p HD</option>
+          <option value="auto">Auto Adaptive</option>
+        </select>
+      </div>
+
+      <div class="setting-row">
+        <div class="setting-info">
+          <span class="setting-name">Dark Mode Theme</span>
+          <span class="setting-desc">Modern Japanese Editorial Theme</span>
+        </div>
+        <span class="meta-tag">DARK FIRST (ACTIVE)</span>
+      </div>
+    </div>
+
+    <div class="action-footer">
+      <Button variant="secondary" size="lg" class="w-full">LOG OUT</Button>
+    </div>
+  </div>
+</MainLayout>
+
+<style>
+  .profile-page {
+    padding-top: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 32px;
+  }
+
+  .user-header-card {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 24px;
+    background-color: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+  }
+
+  .avatar {
+    width: 80px;
+    height: 80px;
+    border-radius: var(--radius-full);
+    object-fit: cover;
+    border: 2px solid var(--accent-red);
+  }
+
+  .user-info {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+
+  .user-name {
+    font-family: var(--font-hero);
+    font-size: 1.5rem;
+    font-weight: 800;
+  }
+
+  .user-handle {
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    color: var(--text-muted);
+  }
+
+  .member-badge {
+    margin-top: 4px;
+    padding: 2px 8px;
+    border-radius: var(--radius-full);
+    background-color: rgba(244, 162, 97, 0.15);
+    color: var(--accent-orange);
+    border: 1px solid var(--accent-orange);
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    font-weight: 700;
+  }
+
+  /* Stats Grid */
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+  }
+
+  .stat-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 16px 8px;
+    background-color: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    text-align: center;
+  }
+
+  .stat-value {
+    font-family: var(--font-hero);
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: #ffffff;
+  }
+
+  .stat-label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 4px;
+  }
+
+  /* Settings Group */
+  .settings-group {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .settings-title {
+    font-family: var(--font-hero);
+    font-size: 1.1rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: var(--text-secondary);
+  }
+
+  .setting-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px;
+    background-color: var(--bg-elevated);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+  }
+
+  .setting-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .setting-name {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #ffffff;
+  }
+
+  .setting-desc {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+  }
+
+  .setting-select {
+    background-color: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    color: #ffffff;
+    padding: 6px 12px;
+    border-radius: var(--radius-sm);
+    font-family: var(--font-body);
+    font-size: 0.85rem;
+  }
+
+  .meta-tag {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    color: var(--accent-red);
+    font-weight: 700;
+  }
+
+  .w-full {
+    width: 100%;
+  }
+</style>

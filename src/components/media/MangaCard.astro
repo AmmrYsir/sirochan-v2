@@ -1,0 +1,103 @@
+---
+import type { MediaItem } from '../../types';
+
+interface Props {
+  item: MediaItem;
+}
+
+const { item } = Astro.props;
+---
+
+<a href={`/manga/${item.id}`} class="manga-card" data-type="manga" data-title={item.title.toLowerCase()} data-genres={item.genres.join(',').toLowerCase()}>
+  <div class="card-cover-container">
+    <img src={item.coverImage} alt={item.title} class="card-cover" loading="lazy" />
+    {item.progressPercent !== undefined && (
+      <div class="progress-bar-track">
+        <div class="progress-bar-fill" style={`width: ${item.progressPercent}%`}></div>
+      </div>
+    )}
+  </div>
+  <div class="card-info">
+    <h3 class="card-title">{item.title}</h3>
+    <p class="card-meta">{item.progressText || `${item.latestChapterOrEpisode} • ${item.updatedAgo}`}</p>
+  </div>
+</a>
+
+<style>
+  .manga-card {
+    display: flex;
+    flex-direction: column;
+    width: 140px;
+    flex-shrink: 0;
+    text-decoration: none;
+    transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  @media (min-width: 640px) {
+    .manga-card {
+      width: 160px;
+    }
+  }
+
+  .manga-card:hover {
+    transform: translateY(-4px);
+  }
+
+  .card-cover-container {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 3 / 4;
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    background-color: var(--bg-elevated);
+    border: 1px solid var(--border-subtle);
+    margin-bottom: 8px;
+  }
+
+  .card-cover {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .progress-bar-track {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background-color: var(--bg-container-high);
+  }
+
+  .progress-bar-fill {
+    height: 100%;
+    background-color: var(--accent-red);
+  }
+
+  .card-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .card-title {
+    font-family: var(--font-hero);
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text-primary);
+    line-height: 20px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .card-meta {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text-muted);
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    line-height: 16px;
+  }
+</style>

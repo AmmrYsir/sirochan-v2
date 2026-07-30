@@ -1,0 +1,263 @@
+---
+import MainLayout from '../../layouts/MainLayout.astro';
+import Button from '../../components/common/Button.astro';
+import Badge from '../../components/common/Badge.astro';
+import { mockMediaList } from '../../db/mockData';
+
+export function getStaticPaths() {
+  return mockMediaList
+    .filter(m => m.type === 'manga')
+    .map(item => ({ params: { id: item.id } }));
+}
+
+const { id } = Astro.params;
+const item = mockMediaList.find(m => m.id === id) || mockMediaList[0];
+const chapters = item.chapters || Array.from({ length: 10 }, (_, i) => ({
+  id: `${item.id}-ch-${100 - i}`,
+  mediaId: item.id,
+  chapterNumber: 100 - i,
+  title: `Chapter ${100 - i}: The Awakening Arc`,
+  totalPages: 24,
+  pages: [],
+  releaseDate: '2026-07-20'
+}));
+---
+
+<MainLayout title={`${item.title} - Manga on Sirochan`}>
+  <div class="manga-detail-page">
+    <!-- Banner Header -->
+    <div class="detail-banner-wrapper">
+      <img src={item.bannerImage} alt={item.title} class="detail-banner" />
+      <div class="banner-overlay"></div>
+    </div>
+
+    <div class="detail-content container-constrained">
+      <div class="detail-grid">
+        <!-- Cover & Actions -->
+        <div class="cover-column">
+          <img src={item.coverImage} alt={item.title} class="main-cover" />
+          <Button href={`/manga/${item.id}/${chapters[0].id}`} variant="primary" size="lg" class="read-btn">
+            READ FIRST CH.
+          </Button>
+        </div>
+
+        <!-- Meta & Overview -->
+        <div class="info-column">
+          <Badge variant="red" class="status-badge">{item.status}</Badge>
+          <h1 class="manga-title">{item.title}</h1>
+          <p class="jp-title">{item.japaneseTitle}</p>
+
+          <div class="meta-row">
+            <span class="rating-badge">★ {item.rating}</span>
+            <span class="meta-dot">•</span>
+            <span class="meta-mono">{chapters.length} CHAPTERS</span>
+          </div>
+
+          <div class="genre-tags">
+            {item.genres.map(g => (
+              <span class="genre-pill">{g}</span>
+            ))}
+          </div>
+
+          <p class="description">{item.description}</p>
+        </div>
+      </div>
+
+      <!-- Chapter List -->
+      <section class="chapters-section">
+        <h2 class="section-title">CHAPTER LIST ({chapters.length})</h2>
+        <div class="chapters-stack">
+          {chapters.map(ch => (
+            <a href={`/manga/${item.id}/${ch.id}`} class="chapter-row">
+              <div class="ch-left">
+                <span class="ch-num">CH. {ch.chapterNumber}</span>
+                <span class="ch-title">{ch.title}</span>
+              </div>
+              <span class="ch-date">{ch.releaseDate}</span>
+            </a>
+          ))}
+        </div>
+      </section>
+    </div>
+  </div>
+</MainLayout>
+
+<style>
+  .detail-banner-wrapper {
+    position: relative;
+    width: 100%;
+    height: 260px;
+    overflow: hidden;
+  }
+
+  .detail-banner {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .banner-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(0,0,0,0.3) 0%, var(--bg-deep) 100%);
+  }
+
+  .detail-content {
+    margin-top: -80px;
+    position: relative;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    gap: 40px;
+  }
+
+  .detail-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+
+  @media (min-width: 640px) {
+    .detail-grid {
+      grid-template-columns: 200px 1fr;
+    }
+  }
+
+  .cover-column {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .main-cover {
+    width: 100%;
+    aspect-ratio: 3 / 4;
+    border-radius: var(--radius-md);
+    object-fit: cover;
+    border: 1px solid var(--border-subtle);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+  }
+
+  .read-btn {
+    width: 100%;
+  }
+
+  .info-column {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .manga-title {
+    font-family: var(--font-hero);
+    font-size: 2.2rem;
+    font-weight: 800;
+    line-height: 1.1;
+  }
+
+  .jp-title {
+    font-size: 0.95rem;
+    color: var(--text-muted);
+  }
+
+  .meta-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 4px;
+  }
+
+  .rating-badge {
+    font-family: var(--font-mono);
+    font-weight: 700;
+    color: var(--accent-orange);
+    font-size: 0.9rem;
+  }
+
+  .meta-dot {
+    color: var(--text-dim);
+  }
+
+  .meta-mono {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    color: var(--text-muted);
+  }
+
+  .genre-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .genre-pill {
+    padding: 4px 10px;
+    border-radius: var(--radius-full);
+    background-color: var(--bg-elevated);
+    border: 1px solid var(--border-subtle);
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+  }
+
+  .description {
+    font-size: 0.95rem;
+    line-height: 1.6;
+    color: var(--text-secondary);
+    margin-top: 8px;
+  }
+
+  .chapters-section {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .chapters-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .chapter-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px;
+    background-color: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    text-decoration: none;
+    transition: all 0.2s ease;
+  }
+
+  .chapter-row:hover {
+    border-color: var(--text-muted);
+    background-color: var(--bg-elevated);
+  }
+
+  .ch-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .ch-num {
+    font-family: var(--font-mono);
+    font-weight: 700;
+    color: var(--accent-red);
+    font-size: 0.85rem;
+  }
+
+  .ch-title {
+    font-weight: 600;
+    color: var(--text-primary);
+    font-size: 0.95rem;
+  }
+
+  .ch-date {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--text-muted);
+  }
+</style>

@@ -1,0 +1,75 @@
+---
+interface Props {
+  variant?: 'primary' | 'secondary' | 'ghost';
+  size?: 'sm' | 'md' | 'lg';
+  href?: string;
+  class?: string;
+}
+
+const { variant = 'primary', size = 'md', href, class: className = '' } = Astro.props;
+const Component = href ? 'a' : 'button';
+---
+
+<Component href={href} class={`btn btn-${variant} btn-${size} ${className}`}>
+  <slot />
+</Component>
+
+<style>
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-family: var(--font-body);
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    border-radius: var(--radius-md);
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    text-decoration: none;
+    cursor: pointer;
+  }
+
+  /* Sizes */
+  .btn-sm {
+    padding: 6px 14px;
+    font-size: 12px;
+  }
+  .btn-md {
+    padding: 10px 20px;
+    font-size: 13px;
+  }
+  .btn-lg {
+    padding: 14px 28px;
+    font-size: 14px;
+  }
+
+  /* Variants matching DESIGN.md */
+  .btn-primary {
+    background-color: var(--accent-red);
+    color: #ffffff;
+    box-shadow: 0 4px 14px rgba(230, 57, 70, 0.3);
+  }
+  .btn-primary:hover {
+    background-color: #f04855;
+    transform: translateY(-1px);
+  }
+
+  .btn-secondary {
+    background-color: transparent;
+    color: #ffffff;
+    border: 1px solid var(--border-subtle);
+  }
+  .btn-secondary:hover {
+    background-color: var(--bg-elevated);
+    border-color: var(--text-muted);
+  }
+
+  .btn-ghost {
+    background-color: transparent;
+    color: var(--text-muted);
+  }
+  .btn-ghost:hover {
+    color: #ffffff;
+  }
+</style>

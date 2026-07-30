@@ -1,0 +1,141 @@
+---
+import MainLayout from '../layouts/MainLayout.astro';
+import MangaCard from '../components/media/MangaCard.astro';
+import AnimeCard from '../components/media/AnimeCard.astro';
+import { mockMediaList } from '../db/mockData';
+
+const continueMedia = mockMediaList.filter(m => m.progressPercent !== undefined);
+const bookmarkedMedia = mockMediaList.filter(m => m.trendingRank || m.rating >= 4.9);
+---
+
+<MainLayout title="My Library - Sirochan" activeTab="library">
+  <div class="library-page container-constrained">
+    <div class="library-header">
+      <h1 class="page-title">MY LIBRARY</h1>
+      
+      <div class="lib-tabs">
+        <button class="lib-tab active">In Progress ({continueMedia.length})</button>
+        <button class="lib-tab">Bookmarks ({bookmarkedMedia.length})</button>
+        <button class="lib-tab">Favorites</button>
+        <button class="lib-tab">History</button>
+      </div>
+    </div>
+
+    <!-- Continue / In Progress Section -->
+    <section class="lib-section">
+      <h2 class="section-subtitle">CONTINUE READING & WATCHING</h2>
+      <div class="media-grid">
+        {continueMedia.map(item => (
+          item.type === 'manga' ? (
+            <MangaCard item={item} />
+          ) : (
+            <AnimeCard item={item} />
+          )
+        ))}
+      </div>
+    </section>
+
+    <!-- Bookmarks Section -->
+    <section class="lib-section">
+      <h2 class="section-subtitle">BOOKMARKED TITLES</h2>
+      <div class="media-grid">
+        {bookmarkedMedia.map(item => (
+          item.type === 'manga' ? (
+            <MangaCard item={item} />
+          ) : (
+            <AnimeCard item={item} />
+          )
+        ))}
+      </div>
+    </section>
+  </div>
+</MainLayout>
+
+<script>
+  const libTabs = document.querySelectorAll('.lib-tab');
+  const sections = document.querySelectorAll('.lib-section');
+
+  libTabs.forEach((tab, index) => {
+    tab.addEventListener('click', () => {
+      libTabs.forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+
+      sections.forEach((sec, sIdx) => {
+        if (index === 0) {
+          (sec as HTMLElement).style.display = 'flex';
+        } else if (index === 1) {
+          (sec as HTMLElement).style.display = sIdx === 1 ? 'flex' : 'none';
+        } else {
+          (sec as HTMLElement).style.display = sIdx === 0 ? 'flex' : 'none';
+        }
+      });
+    });
+  });
+</script>
+
+<style>
+  .library-page {
+    padding-top: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 32px;
+  }
+
+  .page-title {
+    font-family: var(--font-hero);
+    font-size: 2rem;
+    font-weight: 800;
+    margin-bottom: 16px;
+  }
+
+  .lib-tabs {
+    display: flex;
+    gap: 8px;
+    border-bottom: 1px solid var(--border-subtle);
+    padding-bottom: 8px;
+    overflow-x: auto;
+  }
+
+  .lib-tab {
+    padding: 8px 16px;
+    border-radius: var(--radius-md);
+    font-family: var(--font-body);
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    white-space: nowrap;
+  }
+
+  .lib-tab.active {
+    background-color: var(--bg-elevated);
+    color: #ffffff;
+    border: 1px solid var(--border-subtle);
+  }
+
+  .lib-section {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .section-subtitle {
+    font-family: var(--font-hero);
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--text-secondary);
+    letter-spacing: 0.03em;
+  }
+
+  .media-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 20px 16px;
+  }
+
+  @media (min-width: 640px) {
+    .media-grid {
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 24px 20px;
+    }
+  }
+</style>

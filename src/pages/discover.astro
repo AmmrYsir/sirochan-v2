@@ -1,0 +1,213 @@
+---
+import MainLayout from '../layouts/MainLayout.astro';
+import MangaCard from '../components/media/MangaCard.astro';
+import AnimeCard from '../components/media/AnimeCard.astro';
+import { mockMediaList } from '../db/mockData';
+
+const genres = ['All', 'Action', 'Dark Fantasy', 'Sports', 'Drama', 'Sci-Fi', 'Supernatural'];
+---
+
+<MainLayout title="Discover - Sirochan" activeTab="discover">
+  <div class="discover-page container-constrained">
+    <div class="search-header">
+      <h1 class="page-title">DISCOVER</h1>
+      
+      <!-- Search Input -->
+      <div class="search-box">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="search-icon">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+        <input type="text" placeholder="Search title, author, or genre..." class="search-input" id="discover-search" />
+      </div>
+
+      <!-- Type Filter Tabs -->
+      <div class="filter-type-tabs">
+        <button class="type-tab active" data-type="all">All Media</button>
+        <button class="type-tab" data-type="manga">Manga Only</button>
+        <button class="type-tab" data-type="anime">Anime Only</button>
+      </div>
+
+      <!-- Genre Pills -->
+      <div class="genre-row hide-scrollbar">
+        {genres.map((g, idx) => (
+          <button class={`genre-chip ${idx === 0 ? 'active' : ''}`}>{g}</button>
+        ))}
+      </div>
+    </div>
+
+    <!-- Media Grid -->
+    <div class="media-grid">
+      {mockMediaList.map(item => (
+        item.type === 'manga' ? (
+          <MangaCard item={item} />
+        ) : (
+          <AnimeCard item={item} />
+        )
+      ))}
+    </div>
+  </div>
+</MainLayout>
+
+<script>
+  const searchInput = document.getElementById('discover-search') as HTMLInputElement;
+  const typeTabs = document.querySelectorAll('.type-tab');
+  const genreChips = document.querySelectorAll('.genre-chip');
+  const cards = document.querySelectorAll('.manga-card, .anime-card');
+
+  let activeType = 'all';
+  let activeGenre = 'All';
+  let searchQuery = '';
+
+  function filterCards() {
+    cards.forEach(card => {
+      const cardType = card.getAttribute('data-type') || '';
+      const cardTitle = card.getAttribute('data-title') || '';
+      const cardGenres = card.getAttribute('data-genres') || '';
+
+      const matchesType = activeType === 'all' || cardType === activeType;
+      const matchesGenre = activeGenre === 'All' || cardGenres.includes(activeGenre.toLowerCase());
+      const matchesSearch = !searchQuery || cardTitle.includes(searchQuery.toLowerCase()) || cardGenres.includes(searchQuery.toLowerCase());
+
+      if (matchesType && matchesGenre && matchesSearch) {
+        (card as HTMLElement).style.display = 'flex';
+      } else {
+        (card as HTMLElement).style.display = 'none';
+      }
+    });
+  }
+
+  typeTabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      typeTabs.forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      activeType = tab.getAttribute('data-type') || 'all';
+      filterCards();
+    });
+  });
+
+  genreChips.forEach(chip => {
+    chip.addEventListener('click', () => {
+      genreChips.forEach(c => c.classList.remove('active'));
+      chip.classList.add('active');
+      activeGenre = chip.textContent?.trim() || 'All';
+      filterCards();
+    });
+  });
+
+  searchInput?.addEventListener('input', (e) => {
+    searchQuery = (e.target as HTMLInputElement).value;
+    filterCards();
+  });
+</script>
+
+<style>
+  .discover-page {
+    padding-top: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  .page-title {
+    font-family: var(--font-hero);
+    font-size: 2rem;
+    font-weight: 800;
+    margin-bottom: 16px;
+  }
+
+  .search-box {
+    position: relative;
+    width: 100%;
+    margin-bottom: 16px;
+  }
+
+  .search-icon {
+    position: absolute;
+    left: 16px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+  }
+
+  .search-input {
+    width: 100%;
+    height: 48px;
+    padding-left: 48px;
+    padding-right: 16px;
+    background-color: var(--bg-elevated);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    color: #ffffff;
+    font-family: var(--font-body);
+    font-size: 0.95rem;
+    outline: none;
+    transition: border-color 0.2s ease;
+  }
+
+  .search-input:focus {
+    border-color: #ffffff;
+  }
+
+  .filter-type-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+
+  .type-tab {
+    padding: 8px 16px;
+    border-radius: var(--radius-md);
+    font-family: var(--font-body);
+    font-size: 0.85rem;
+    font-weight: 600;
+    background-color: var(--bg-surface);
+    color: var(--text-muted);
+    border: 1px solid var(--border-subtle);
+    transition: all 0.2s ease;
+  }
+
+  .type-tab.active {
+    background-color: var(--accent-red);
+    color: #ffffff;
+    border-color: var(--accent-red);
+  }
+
+  .genre-row {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 8px;
+  }
+
+  .genre-chip {
+    padding: 6px 14px;
+    border-radius: var(--radius-full);
+    font-size: 0.8rem;
+    font-weight: 500;
+    white-space: nowrap;
+    background-color: var(--bg-elevated);
+    color: var(--text-muted);
+    border: 1px solid var(--border-subtle);
+  }
+
+  .genre-chip.active {
+    background-color: #ffffff;
+    color: #000000;
+    border-color: #ffffff;
+    font-weight: 700;
+  }
+
+  .media-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 20px 16px;
+  }
+
+  @media (min-width: 640px) {
+    .media-grid {
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 24px 20px;
+    }
+  }
+</style>

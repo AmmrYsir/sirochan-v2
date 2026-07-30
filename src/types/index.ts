@@ -1,0 +1,59 @@
+export type MediaType = 'manga' | 'anime';
+
+export interface MangaChapter {
+  id: string;
+  mediaId: string;
+  chapterNumber: number;
+  title: string;
+  totalPages: number;
+  pages: string[];
+  releaseDate: string;
+  readProgressPercent?: number;
+}
+
+export interface AnimeEpisode {
+  id: string;
+  mediaId: string;
+  episodeNumber: number;
+  seasonNumber: number;
+  title: string;
+  duration: string; // e.g. "23:10"
+  timeMarker?: string; // e.g. "12:45"
+  videoUrl: string;
+  thumbnail: string;
+  watchProgressPercent?: number;
+}
+
+export interface MediaItem {
+  id: string;
+  title: string;
+  japaneseTitle?: string;
+  type: MediaType;
+  coverImage: string;
+  bannerImage: string;
+  description: string;
+  rating: number; // e.g. 4.9
+  status: 'RELEASING' | 'FINISHED' | 'UPCOMING';
+  genres: string[];
+  trendingRank?: number;
+  isEditorialSelection?: boolean;
+  editorialExcerpt?: string;
+  latestChapterOrEpisode: string;
+  updatedAgo: string;
+  progressPercent?: number;
+  progressText?: string;
+  chapters?: MangaChapter[];
+  episodes?: AnimeEpisode[];
+}
+
+export interface UserProfile {
+  id: string;
+  username: string;
+  handle: string;
+  avatar: string;
+  chaptersRead: number;
+  hoursWatched: number;
+  readingStreakDays: number;
+  preferredReaderMode: 'single' | 'continuous';
+  preferredStreamQuality: '1080p' | '720p' | 'auto';
+}
