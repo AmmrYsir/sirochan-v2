@@ -89,6 +89,25 @@ export interface SourceHealthCheck {
   responseTimeMs: number;
 }
 
+export interface UnifiedBrowseRequest {
+  query?: string;
+  mediaType?: 'all' | 'anime' | 'manga';
+  sourceIds?: string[];
+  page?: number;
+  perPage?: number;
+  sortBy?: 'relevance' | 'title' | 'source';
+}
+
+export interface UnifiedBrowseResult {
+  items: SourceBrowseItem[];
+  page: number;
+  perPage: number;
+  totalItems: number;
+  totalPages: number;
+  sourcesQueried: string[];
+  failedSources: string[];
+}
+
 /**
  * Production-grade API Client connecting Sirochan v2 to Loouwd FastAPI Microservice Core.
  */
@@ -169,6 +188,58 @@ export class ApiService {
   }
 
   /**
+   * Unified multi-source parallel browse query across adapters
+   */
+  static async unifiedBrowse(request: UnifiedBrowseRequest): Promise<UnifiedBrowseResult> {
+    try {
+      const res = await fetch(`${BASE_URL}/api/v1/unified/browse`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(request),
+        signal: AbortSignal.timeout(4000)
+      });
+      if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+      return await res.json();
+    } catch (err) {
+      console.warn('[ApiService] Unified browse failed, using fallback:', err);
+      return {
+        items: [],
+        page: 1,
+        perPage: 24,
+        totalItems: 0,
+        totalPages: 1,
+        sourcesQueried: [],
+        failedSources: []
+      };
+    }
+  }
+
+  /**
+   * Unified aggregated media feed
+   */
+  static async unifiedFeed(mediaType: 'all' | 'anime' | 'manga' = 'all', page = 1): Promise<UnifiedBrowseResult> {
+    try {
+      const url = new URL(`${BASE_URL}/api/v1/unified/feed/${mediaType}`);
+      url.searchParams.append('page', page.toString());
+
+      const res = await fetch(url.toString(), { signal: AbortSignal.timeout(4000) });
+      if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+      return await res.json();
+    } catch (err) {
+      console.warn('[ApiService] Unified feed failed:', err);
+      return {
+        items: [],
+        page: 1,
+        perPage: 24,
+        totalItems: 0,
+        totalPages: 1,
+        sourcesQueried: [],
+        failedSources: []
+      };
+    }
+  }
+
+  /**
    * Fetch detailed title metadata
    */
   static async getTitleDetails(sourceId: string, sourceTitleId: string): Promise<SourceTitleDetails | null> {
@@ -216,5 +287,12 @@ export class ApiService {
       console.warn(`[ApiService] Failed to fetch playback stream for ${sourceTitleId}:`, err);
       return null;
     }
+  }
+
+  /**
+   * Get Server-Sent Events (SSE) stream URL for real-time multi-source search
+   */
+  static getStreamUrl(query: string, mediaType: 'all' | 'anime' | 'manga' = 'all'): string {
+    return `${BASE_URL}/api/v1/unified/stream?query=${encodeURIComponent(query)}&media_type=${mediaType}`;
   }
 }
