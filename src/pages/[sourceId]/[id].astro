@@ -3,6 +3,7 @@ import MainLayout from '../../layouts/MainLayout.astro';
 import Button from '../../components/common/Button.astro';
 import Badge from '../../components/common/Badge.astro';
 import { ApiService } from '../../db/apiService';
+import { MANGA_PLACEHOLDER, ANIME_PLACEHOLDER } from '../../utils/placeholders';
 
 
 function formatHumanDate(dateStr?: string | null): string | null {
@@ -92,7 +93,12 @@ const chapters = Array.from({ length: count }, (_, i) => ({
   <div class="manga-detail-page">
     <!-- Banner Header -->
     <div class="detail-banner-wrapper">
-      <img src={item.bannerImage} alt={item.title} class="detail-banner" />
+      <img
+        src={item.bannerImage || ANIME_PLACEHOLDER}
+        alt={item.title}
+        class="detail-banner"
+        onerror={`this.onerror=null; this.src='${ANIME_PLACEHOLDER}';`}
+      />
       <div class="banner-overlay"></div>
     </div>
 
@@ -100,7 +106,12 @@ const chapters = Array.from({ length: count }, (_, i) => ({
       <div class="detail-grid">
         <!-- Cover & Actions -->
         <div class="cover-column">
-          <img src={item.coverImage} alt={item.title} class="main-cover" />
+          <img
+            src={item.coverImage || MANGA_PLACEHOLDER}
+            alt={item.title}
+            class="main-cover"
+            onerror={`this.onerror=null; this.src='${MANGA_PLACEHOLDER}';`}
+          />
           <Button
             href={`/${sourceId}/${item.id}/${chapters[0].id}`}
             variant="primary"

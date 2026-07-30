@@ -1,5 +1,6 @@
 ---
 import type { MediaItem } from '../../types';
+import { ANIME_PLACEHOLDER } from '../../utils/placeholders';
 
 interface Props {
   item: MediaItem;
@@ -7,11 +8,18 @@ interface Props {
 
 const { item } = Astro.props;
 const targetHref = `/${item.sourceId || 'hianime'}/${item.id}`;
+const thumbSrc = item.coverImage || ANIME_PLACEHOLDER;
 ---
 
 <a href={targetHref} class="anime-card" data-type="anime" data-title={item.title.toLowerCase()} data-genres={item.genres.join(',').toLowerCase()}>
   <div class="card-thumb-container">
-    <img src={item.coverImage} alt={item.title} class="card-thumb" loading="lazy" />
+    <img
+      src={thumbSrc}
+      alt={item.title}
+      class="card-thumb"
+      loading="lazy"
+      onerror={`this.onerror=null; this.src='${ANIME_PLACEHOLDER}';`}
+    />
     <div class="play-overlay">
       <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
         <polygon points="5 3 19 12 5 21 5 3"></polygon>

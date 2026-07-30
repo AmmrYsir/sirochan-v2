@@ -1,17 +1,24 @@
 ---
 import Button from '../common/Button.astro';
 import type { MediaItem } from '../../types';
+import { ANIME_PLACEHOLDER } from '../../utils/placeholders';
 
 interface Props {
   item: MediaItem;
 }
 
 const { item } = Astro.props;
+const bannerSrc = item.bannerImage || ANIME_PLACEHOLDER;
 ---
 
 <section class="hero-banner">
   <div class="hero-bg-wrapper">
-    <img src={item.bannerImage} alt={item.title} class="hero-bg" />
+    <img
+      src={bannerSrc}
+      alt={item.title}
+      class="hero-bg"
+      onerror={`this.onerror=null; this.src='${ANIME_PLACEHOLDER}';`}
+    />
     <div class="hero-overlay"></div>
   </div>
 

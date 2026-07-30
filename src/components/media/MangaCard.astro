@@ -1,5 +1,6 @@
 ---
 import type { MediaItem } from '../../types';
+import { MANGA_PLACEHOLDER } from '../../utils/placeholders';
 
 interface Props {
   item: MediaItem;
@@ -7,11 +8,18 @@ interface Props {
 
 const { item } = Astro.props;
 const targetHref = `/${item.sourceId || 'mangadex'}/${item.id}`;
+const coverSrc = item.coverImage || MANGA_PLACEHOLDER;
 ---
 
 <a href={targetHref} class="manga-card" data-type="manga" data-title={item.title.toLowerCase()} data-genres={item.genres.join(',').toLowerCase()}>
   <div class="card-cover-container">
-    <img src={item.coverImage} alt={item.title} class="card-cover" loading="lazy" />
+    <img
+      src={coverSrc}
+      alt={item.title}
+      class="card-cover"
+      loading="lazy"
+      onerror={`this.onerror=null; this.src='${MANGA_PLACEHOLDER}';`}
+    />
     {item.progressPercent !== undefined && (
       <div class="progress-bar-track">
         <div class="progress-bar-fill" style={`width: ${item.progressPercent}%`}></div>

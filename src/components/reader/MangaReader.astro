@@ -1,5 +1,6 @@
 ---
 import ImageViewer from "../common/ImageViewer.astro";
+import { MANGA_PLACEHOLDER } from "../../utils/placeholders";
 
 interface Props {
 	mangaTitle: string;
@@ -72,6 +73,7 @@ const {
 						alt={`Page ${idx + 1}`}
 						class="manga-page-img"
 						loading="lazy"
+						onerror={`this.onerror=null; this.src='${MANGA_PLACEHOLDER}';`}
 					/>
 					<div class="page-overlay-tag">
 						<span>
