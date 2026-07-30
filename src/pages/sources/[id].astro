@@ -86,13 +86,6 @@ const sourceMedia = liveItems.map(item => {
 
 const popularItems = sourceMedia.slice(0, 4);
 
-const manifestCategories = source.categories || [];
-const itemGenres = sourceMedia.flatMap(m => m.genres || []);
-const combinedGenres = Array.from(new Set([...manifestCategories, ...itemGenres]))
-  .filter(g => g && !g.toLowerCase().includes('all'))
-  .sort();
-
-const genres = ['All', ...combinedGenres];
 ---
 
 <MainLayout title={`${source.name} Provider - Sirochan`} activeTab="discover">
@@ -147,50 +140,16 @@ const genres = ['All', ...combinedGenres];
       </div>
     </div>
 
-    <!-- Filter & Search Toolbar -->
-    <div class="catalog-toolbar">
-      <!-- Catalog Search Field -->
+    <!-- Full-Width Hero Catalog Search Bar -->
+    <div class="hero-search-wrapper">
       <div class="catalog-search-box">
         <span class="search-icon">🔍</span>
         <input 
           type="text" 
           id="catalog-search" 
-          placeholder={`Search ${source.name} catalog...`} 
+          placeholder={`Search titles, tags, or keywords in ${source.name}...`} 
           class="catalog-search-input" 
         />
-      </div>
-
-      {backendFilters.length > 0 && (
-        <div class="backend-filters-row">
-          {backendFilters.map(f => (
-            f.type === 'select' && f.options && f.options.length > 0 ? (
-              <div class="filter-group">
-                <label class="filter-label" for={`filter-${f.key}`}>{f.label}:</label>
-                <select class="backend-filter-select" id={`filter-${f.key}`} data-filter-key={f.key}>
-                  {f.options.map(opt => (
-                    <option value={opt.value} selected={opt.value === f.defaultValue}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            ) : f.type === 'text' ? (
-              <div class="filter-group">
-                <label class="filter-label" for={`filter-${f.key}`}>{f.label}:</label>
-                <input type="text" class="backend-filter-input" id={`filter-${f.key}`} data-filter-key={f.key} placeholder={f.placeholder || f.label} />
-              </div>
-            ) : null
-          ))}
-        </div>
-      )}
-
-      <!-- Genre Filter Pills -->
-      <div class="genre-filter-row">
-        {genres.map((g, idx) => (
-          <button class={`genre-chip ${idx === 0 ? 'active' : ''}`} data-genre={g}>
-            {g}
-          </button>
-        ))}
       </div>
     </div>
 
@@ -213,23 +172,34 @@ const genres = ['All', ...combinedGenres];
     <!-- Full Source Catalog Grid -->
     <section class="catalog-section">
       <div class="section-header-row">
-        <h2 class="section-title">ALL CATALOG TITLES ({sourceMedia.length})</h2>
-        <div class="sort-segmented-control">
-          <span class="sort-icon-label">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="6" y1="12" x2="18" y2="12"/><line x1="9" y1="18" x2="15" y2="18"/></svg>
-            SORT
-          </span>
-          <div class="sort-pills-wrapper">
-            <button class="sort-pill active" data-sort="latest">
-              <span>Latest</span>
-              <svg class="sort-arrow-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
-            </button>
-            <button class="sort-pill" data-sort="oldest">
-              <span>Oldest</span>
-              <svg class="sort-arrow-icon" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="18 15 12 9 6 15"/></svg>
+        <h2 class="section-title" id="catalog-title-header">ALL CATALOG TITLES ({sourceMedia.length})</h2>
+
+        {backendFilters.length > 0 && (
+          <div class="backend-filters-row">
+            {backendFilters.map(f => (
+              f.type === 'select' && f.options && f.options.length > 0 ? (
+                <div class="filter-group">
+                  <label class="filter-label" for={`filter-${f.key}`}>{f.label}:</label>
+                  <select class="backend-filter-select" id={`filter-${f.key}`} data-filter-key={f.key}>
+                    {f.options.map(opt => (
+                      <option value={opt.value} selected={opt.value === f.defaultValue}>
+                        {opt.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : f.type === 'text' ? (
+                <div class="filter-group">
+                  <label class="filter-label" for={`filter-${f.key}`}>{f.label}:</label>
+                  <input type="text" class="backend-filter-input" id={`filter-${f.key}`} data-filter-key={f.key} placeholder={f.placeholder || f.label} />
+                </div>
+              ) : null
+            ))}
+            <button type="button" class="clear-filters-btn" id="clear-filters-btn" title="Reset all filters">
+              ✕ RESET
             </button>
           </div>
-        </div>
+        )}
       </div>
 
       <div class="media-grid" id="catalog-grid" data-source-id={source.id}>
@@ -255,14 +225,14 @@ const genres = ['All', ...combinedGenres];
   const filterSelects = document.querySelectorAll('.backend-filter-select') as NodeListOf<HTMLSelectElement>;
   const filterInputs = document.querySelectorAll('.backend-filter-input') as NodeListOf<HTMLInputElement>;
   const searchInput = document.getElementById('catalog-search') as HTMLInputElement;
-  const genreChips = document.querySelectorAll('.genre-chip');
+  const clearFiltersBtn = document.getElementById('clear-filters-btn') as HTMLButtonElement;
+  const titleHeader = document.getElementById('catalog-title-header') as HTMLElement;
   const sortBtns = document.querySelectorAll('.sort-pill');
   const emptyStateEl = document.getElementById('empty-state');
 
   const MANGA_PLACEHOLDER = "data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='400' viewBox='0 0 300 400'%3E%3Crect width='300' height='400' fill='%2318181b'/%3E%3Ctext x='50%25' y='45%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='48' fill='%233f3f46'%3E📚%3C/text%3E%3Ctext x='50%25' y='60%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='12' font-weight='bold' fill='%2371717a' letter-spacing='2'%3ENON-PREVIEW%3C/text%3E%3C/svg%3E";
   const ANIME_PLACEHOLDER = "data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='225' viewBox='0 0 400 225'%3E%3Crect width='400' height='225' fill='%2318181b'/%3E%3Ctext x='50%25' y='45%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='40' fill='%233f3f46'%3E⚡%3C/text%3E%3Ctext x='50%25' y='62%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='12' font-weight='bold' fill='%2371717a' letter-spacing='2'%3ENON-PREVIEW%3C/text%3E%3C/svg%3E";
 
-  let currentGenre = 'All';
   let debounceTimer: any = null;
 
   async function executeBackendFilter() {
@@ -284,6 +254,8 @@ const genres = ['All', ...combinedGenres];
 
     const query = searchInput?.value.trim() || null;
 
+    if (gridContainer) gridContainer.style.opacity = '0.4';
+
     try {
       const res = await fetch(`http://localhost:8000/api/v1/sources/${sourceId}/browse`, {
         method: 'POST',
@@ -294,14 +266,10 @@ const genres = ['All', ...combinedGenres];
       const data = await res.json();
       if (!data || !Array.isArray(data.items)) return;
 
-      let items = data.items;
+      const items = data.items;
 
-      // Apply client-side genre chip filter if selected
-      if (currentGenre !== 'All') {
-        items = items.filter((item: any) => {
-          const gStr = (item.genres || item.tags || []).join(' ').toLowerCase();
-          return gStr.includes(currentGenre.toLowerCase());
-        });
+      if (titleHeader) {
+        titleHeader.textContent = `ALL CATALOG TITLES (${items.length})`;
       }
 
       if (gridContainer) {
@@ -350,6 +318,8 @@ const genres = ['All', ...combinedGenres];
       }
     } catch (err) {
       console.error('[ClientFilter] Error querying loouwd microservice:', err);
+    } finally {
+      if (gridContainer) gridContainer.style.opacity = '1.0';
     }
   }
 
@@ -371,14 +341,14 @@ const genres = ['All', ...combinedGenres];
     });
   }
 
-  genreChips.forEach(chip => {
-    chip.addEventListener('click', () => {
-      genreChips.forEach(c => c.classList.remove('active'));
-      chip.classList.add('active');
-      currentGenre = chip.getAttribute('data-genre') || 'All';
+  if (clearFiltersBtn) {
+    clearFiltersBtn.addEventListener('click', () => {
+      filterSelects.forEach(sel => sel.selectedIndex = 0);
+      filterInputs.forEach(inp => inp.value = '');
+      if (searchInput) searchInput.value = '';
       executeBackendFilter();
     });
-  });
+  }
 
   if (gridContainer) {
     sortBtns.forEach(btn => {
@@ -525,21 +495,85 @@ const genres = ['All', ...combinedGenres];
     flex-wrap: wrap;
   }
 
-  .catalog-toolbar {
+  .hero-search-wrapper {
+    margin-bottom: 24px;
+    width: 100%;
+  }
+
+  .catalog-search-box {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background-color: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    padding: 12px 20px;
+    width: 100%;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  }
+
+  .catalog-search-box:focus-within {
+    border-color: var(--accent-red);
+    box-shadow: 0 0 0 2px rgba(230, 57, 70, 0.25);
+    background-color: var(--bg-elevated);
+  }
+
+  .search-icon {
+    font-size: 1.1rem;
+    color: var(--text-muted);
+  }
+
+  .catalog-search-input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: #ffffff;
+    font-family: var(--font-body);
+    font-size: 0.98rem;
+    font-weight: 500;
+  }
+
+  .catalog-search-input::placeholder {
+    color: var(--text-muted);
+  }
+
+  .catalog-section {
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 24px;
+    margin-bottom: 36px;
+  }
+
+  .section-header-row {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    border-bottom: 1px solid var(--border-subtle);
+    padding-bottom: 12px;
+  }
+
+  @media (min-width: 768px) {
+    .section-header-row {
+      flex-direction: row;
+      align-items: center;
+      justify-content: space-between;
+    }
+  }
+
+  .section-title {
+    font-family: var(--font-hero);
+    font-size: 1.25rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
   }
 
   .backend-filters-row {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    gap: 16px;
-    padding: 12px 16px;
-    background-color: var(--bg-surface);
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-lg);
+    gap: 14px;
   }
 
   .filter-group {
@@ -559,104 +593,46 @@ const genres = ['All', ...combinedGenres];
   }
 
   .backend-filter-select, .backend-filter-input {
-    background-color: var(--bg-elevated);
+    background-color: var(--bg-surface);
     color: #ffffff;
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-md);
-    padding: 6px 12px;
+    padding: 7px 12px;
     font-family: var(--font-body);
     font-size: 0.82rem;
     font-weight: 600;
     outline: none;
     cursor: pointer;
-    transition: border-color 0.2s ease;
+    transition: all 0.2s ease;
+  }
+
+  .backend-filter-select:hover, .backend-filter-input:hover {
+    border-color: var(--text-muted);
+    background-color: var(--bg-elevated);
   }
 
   .backend-filter-select:focus, .backend-filter-input:focus {
     border-color: var(--accent-red);
+    background-color: var(--bg-elevated);
   }
 
-  @media (min-width: 768px) {
-    .catalog-toolbar {
-      flex-direction: row;
-      align-items: center;
-      justify-content: space-between;
-    }
-  }
-
-  .catalog-search-box {
-    display: flex;
-    align-items: center;
-    gap: 10px;
+  .clear-filters-btn {
     background-color: var(--bg-surface);
+    color: var(--accent-red);
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-md);
-    padding: 8px 16px;
-    width: 100%;
-    max-width: 380px;
-  }
-
-  .catalog-search-box:focus-within {
-    border-color: var(--accent-red);
-  }
-
-  .catalog-search-input {
-    background: transparent;
-    border: none;
-    outline: none;
-    color: #ffffff;
-    font-family: var(--font-body);
-    font-size: 0.9rem;
-    width: 100%;
-  }
-
-  .genre-filter-row {
-    display: flex;
-    gap: 8px;
-    overflow-x: auto;
-    padding-bottom: 4px;
-  }
-
-  .genre-chip {
-    padding: 6px 14px;
-    border-radius: var(--radius-full);
-    background-color: var(--bg-surface);
-    border: 1px solid var(--border-subtle);
-    color: var(--text-muted);
-    font-family: var(--font-body);
-    font-size: 0.8rem;
-    font-weight: 600;
+    padding: 6px 12px;
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    font-weight: 700;
     cursor: pointer;
-    white-space: nowrap;
     transition: all 0.2s ease;
   }
 
-  .genre-chip.active, .genre-chip:hover {
-    background-color: var(--bg-elevated);
+  .clear-filters-btn:hover {
+    background-color: var(--accent-red);
     color: #ffffff;
-    border-color: var(--text-muted);
-  }
-
-  .catalog-section {
-    display: flex;
-    flex-direction: column;
-    gap: 24px;
-    margin-bottom: 36px;
-  }
-
-  .section-header-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    border-bottom: 1px solid var(--border-subtle);
-    padding-bottom: 12px;
-  }
-
-  .section-title {
-    font-family: var(--font-hero);
-    font-size: 1.25rem;
-    font-weight: 800;
-    letter-spacing: 0.04em;
+    border-color: var(--accent-red);
   }
 
   .sort-segmented-control {

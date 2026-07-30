@@ -38,6 +38,13 @@ export interface SourceFilter {
   placeholder?: string;
 }
 
+export interface SourceTagSuggestion {
+  name: string;
+  type: string;
+  count?: number;
+  description?: string;
+}
+
 export interface MediaSource {
   id: string;
   name: string;

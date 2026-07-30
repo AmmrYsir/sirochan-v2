@@ -1,4 +1,4 @@
-import type { MediaSource, MediaItem } from '../types';
+import type { MediaSource, SourceTagSuggestion } from '../types';
 
 const BASE_URL = 'http://localhost:8000';
 
@@ -295,6 +295,23 @@ export class ApiService {
     } catch (err) {
       console.error(`[ApiService] Error fetching playback stream for ${sourceTitleId}:`, err);
       return null;
+    }
+  }
+
+  /**
+   * Real-time tag autocompletion endpoint for UI search inputs
+   */
+  static async autocompleteTags(sourceId: string, query: string, type = 'tag'): Promise<SourceTagSuggestion[]> {
+    if (!query || query.trim().length === 0) return [];
+    try {
+      const res = await fetch(`${BASE_URL}/api/v1/sources/${sourceId}/tags/autocomplete?query=${encodeURIComponent(query)}&type=${encodeURIComponent(type)}`, {
+        signal: AbortSignal.timeout(3000)
+      });
+      if (!res.ok) return [];
+      return await res.json();
+    } catch (err) {
+      console.error(`[ApiService] Tag autocomplete error for ${sourceId}:`, err);
+      return [];
     }
   }
 
