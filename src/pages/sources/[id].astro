@@ -39,8 +39,24 @@ function formatHumanDate(dateStr?: string | null): string | null {
 }
 
 const { id } = Astro.params;
+const sourceId = id || 'mangadex';
+const manifest = await ApiService.getSourceManifest(sourceId);
 const allSources = await ApiService.getSources();
-const source = allSources.find(s => s.id === id) || allSources[0];
+const source = allSources.find(s => s.id === sourceId) || {
+  id: sourceId,
+  name: manifest?.name || sourceId,
+  type: 'manga' as const,
+  language: 'EN',
+  icon: manifest?.iconUrl || '📚',
+  status: 'ONLINE' as const,
+  pingMs: 18,
+  itemCount: '10,000+',
+  description: manifest?.description || '',
+  filters: manifest?.browseConfig?.filters || [],
+  categories: []
+};
+
+const backendFilters = manifest?.browseConfig?.filters || source.filters || [];
 
 // Fetch live catalog items from http://localhost:8000 microservice!
 const browseResult = await ApiService.browseSource(source.id);
@@ -69,8 +85,14 @@ const sourceMedia = liveItems.map(item => {
 });
 
 const popularItems = sourceMedia.slice(0, 4);
-const rawGenres = sourceMedia.flatMap(m => m.genres || []);
-const genres = ['All', ...Array.from(new Set(rawGenres)).filter(Boolean).sort()];
+
+const manifestCategories = source.categories || [];
+const itemGenres = sourceMedia.flatMap(m => m.genres || []);
+const combinedGenres = Array.from(new Set([...manifestCategories, ...itemGenres]))
+  .filter(g => g && !g.toLowerCase().includes('all'))
+  .sort();
+
+const genres = ['All', ...combinedGenres];
 ---
 
 <MainLayout title={`${source.name} Provider - Sirochan`} activeTab="discover">
@@ -138,6 +160,30 @@ const genres = ['All', ...Array.from(new Set(rawGenres)).filter(Boolean).sort()]
         />
       </div>
 
+      {backendFilters.length > 0 && (
+        <div class="backend-filters-row">
+          {backendFilters.map(f => (
+            f.type === 'select' && f.options && f.options.length > 0 ? (
+              <div class="filter-group">
+                <label class="filter-label" for={`filter-${f.key}`}>{f.label}:</label>
+                <select class="backend-filter-select" id={`filter-${f.key}`} data-filter-key={f.key}>
+                  {f.options.map(opt => (
+                    <option value={opt.value} selected={opt.value === f.defaultValue}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : f.type === 'text' ? (
+              <div class="filter-group">
+                <label class="filter-label" for={`filter-${f.key}`}>{f.label}:</label>
+                <input type="text" class="backend-filter-input" id={`filter-${f.key}`} data-filter-key={f.key} placeholder={f.placeholder || f.label} />
+              </div>
+            ) : null
+          ))}
+        </div>
+      )}
+
       <!-- Genre Filter Pills -->
       <div class="genre-filter-row">
         {genres.map((g, idx) => (
@@ -186,7 +232,7 @@ const genres = ['All', ...Array.from(new Set(rawGenres)).filter(Boolean).sort()]
         </div>
       </div>
 
-      <div class="media-grid" id="catalog-grid">
+      <div class="media-grid" id="catalog-grid" data-source-id={source.id}>
         {sourceMedia.map(item => (
           item.type === 'manga' ? (
             <MangaCard item={item} />
@@ -204,48 +250,124 @@ const genres = ['All', ...Array.from(new Set(rawGenres)).filter(Boolean).sort()]
 </MainLayout>
 
 <script>
+  const gridContainer = document.getElementById('catalog-grid') as HTMLElement;
+  const sourceId = gridContainer?.getAttribute('data-source-id') || 'nhentai';
+  const filterSelects = document.querySelectorAll('.backend-filter-select') as NodeListOf<HTMLSelectElement>;
+  const filterInputs = document.querySelectorAll('.backend-filter-input') as NodeListOf<HTMLInputElement>;
   const searchInput = document.getElementById('catalog-search') as HTMLInputElement;
   const genreChips = document.querySelectorAll('.genre-chip');
-  const mediaCards = document.querySelectorAll('.manga-card, .anime-card');
   const sortBtns = document.querySelectorAll('.sort-pill');
-  const gridContainer = document.getElementById('catalog-grid');
-
   const emptyStateEl = document.getElementById('empty-state');
 
+  const MANGA_PLACEHOLDER = "data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='400' viewBox='0 0 300 400'%3E%3Crect width='300' height='400' fill='%2318181b'/%3E%3Ctext x='50%25' y='45%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='48' fill='%233f3f46'%3E📚%3C/text%3E%3Ctext x='50%25' y='60%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='12' font-weight='bold' fill='%2371717a' letter-spacing='2'%3ENON-PREVIEW%3C/text%3E%3C/svg%3E";
+  const ANIME_PLACEHOLDER = "data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='400' height='225' viewBox='0 0 400 225'%3E%3Crect width='400' height='225' fill='%2318181b'/%3E%3Ctext x='50%25' y='45%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='40' fill='%233f3f46'%3E⚡%3C/text%3E%3Ctext x='50%25' y='62%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='12' font-weight='bold' fill='%2371717a' letter-spacing='2'%3ENON-PREVIEW%3C/text%3E%3C/svg%3E";
+
   let currentGenre = 'All';
-  let currentSearch = '';
+  let debounceTimer: any = null;
 
-  function filterCatalog() {
-    let visibleCount = 0;
-    mediaCards.forEach(card => {
-      const cardEl = card as HTMLElement;
-      const title = (cardEl.getAttribute('data-title') || cardEl.querySelector('.card-title')?.textContent || '').toLowerCase();
-      const genres = (cardEl.getAttribute('data-genres') || '').toLowerCase();
-
-      const matchesSearch = !currentSearch || title.includes(currentSearch);
-      const matchesGenre = currentGenre === 'All' || genres.includes(currentGenre.toLowerCase());
-
-      if (matchesSearch && matchesGenre) {
-        cardEl.style.display = 'flex';
-        visibleCount++;
-      } else {
-        cardEl.style.display = 'none';
+  async function executeBackendFilter() {
+    const filters: Record<string, any> = {};
+    
+    filterSelects.forEach(sel => {
+      const key = sel.getAttribute('data-filter-key');
+      if (key && sel.value) {
+        filters[key] = sel.value;
       }
     });
 
-    if (emptyStateEl) {
-      if (visibleCount === 0) {
-        emptyStateEl.classList.remove('hidden');
-      } else {
-        emptyStateEl.classList.add('hidden');
+    filterInputs.forEach(inp => {
+      const key = inp.getAttribute('data-filter-key');
+      if (key && inp.value.trim()) {
+        filters[key] = inp.value.trim();
       }
+    });
+
+    const query = searchInput?.value.trim() || null;
+
+    try {
+      const res = await fetch(`http://localhost:8000/api/v1/sources/${sourceId}/browse`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query, page: 1, filters })
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (!data || !Array.isArray(data.items)) return;
+
+      let items = data.items;
+
+      // Apply client-side genre chip filter if selected
+      if (currentGenre !== 'All') {
+        items = items.filter((item: any) => {
+          const gStr = (item.genres || item.tags || []).join(' ').toLowerCase();
+          return gStr.includes(currentGenre.toLowerCase());
+        });
+      }
+
+      if (gridContainer) {
+        if (items.length === 0) {
+          gridContainer.innerHTML = '';
+          if (emptyStateEl) emptyStateEl.classList.remove('hidden');
+        } else {
+          if (emptyStateEl) emptyStateEl.classList.add('hidden');
+
+          gridContainer.innerHTML = items.map((item: any) => {
+            const safeId = (item.sourceTitleId || 'title').replace(/[\/\s]/g, '-').toLowerCase();
+            const href = `/${item.sourceId || sourceId}/${safeId}`;
+            const cover = item.thumbnailUrl || MANGA_PLACEHOLDER;
+            const isAnime = item.mediaType === 'anime';
+
+            if (isAnime) {
+              return `
+                <a href="${href}" class="anime-card" data-type="anime" data-title="${item.title.toLowerCase()}">
+                  <div class="card-thumb-container">
+                    <img src="${cover}" alt="${item.title}" class="card-thumb" loading="lazy" data-fallback="${ANIME_PLACEHOLDER}" onerror="this.onerror=null; this.src=this.dataset.fallback;" />
+                    <div class="play-overlay">
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                    </div>
+                  </div>
+                  <div class="card-info">
+                    <h3 class="card-title">${item.title}</h3>
+                    <p class="card-meta">EP. ${item.totalEpisodes || 12}</p>
+                  </div>
+                </a>
+              `;
+            } else {
+              return `
+                <a href="${href}" class="manga-card" data-type="manga" data-title="${item.title.toLowerCase()}">
+                  <div class="card-cover-container">
+                    <img src="${cover}" alt="${item.title}" class="card-cover" loading="lazy" data-fallback="${MANGA_PLACEHOLDER}" onerror="this.onerror=null; this.src=this.dataset.fallback;" />
+                  </div>
+                  <div class="card-info">
+                    <h3 class="card-title">${item.title}</h3>
+                    <p class="card-meta">CH. ${item.totalChapters || 100}</p>
+                  </div>
+                </a>
+              `;
+            }
+          }).join('');
+        }
+      }
+    } catch (err) {
+      console.error('[ClientFilter] Error querying loouwd microservice:', err);
     }
   }
 
+  filterSelects.forEach(sel => {
+    sel.addEventListener('change', executeBackendFilter);
+  });
+
+  filterInputs.forEach(inp => {
+    inp.addEventListener('input', () => {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(executeBackendFilter, 300);
+    });
+  });
+
   if (searchInput) {
-    searchInput.addEventListener('input', (e) => {
-      currentSearch = (e.target as HTMLInputElement).value.toLowerCase().trim();
-      filterCatalog();
+    searchInput.addEventListener('input', () => {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(executeBackendFilter, 300);
     });
   }
 
@@ -254,7 +376,7 @@ const genres = ['All', ...Array.from(new Set(rawGenres)).filter(Boolean).sort()]
       genreChips.forEach(c => c.classList.remove('active'));
       chip.classList.add('active');
       currentGenre = chip.getAttribute('data-genre') || 'All';
-      filterCatalog();
+      executeBackendFilter();
     });
   });
 
@@ -407,6 +529,51 @@ const genres = ['All', ...Array.from(new Set(rawGenres)).filter(Boolean).sort()]
     display: flex;
     flex-direction: column;
     gap: 16px;
+  }
+
+  .backend-filters-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 16px;
+    padding: 12px 16px;
+    background-color: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+  }
+
+  .filter-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .filter-label {
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    white-space: nowrap;
+  }
+
+  .backend-filter-select, .backend-filter-input {
+    background-color: var(--bg-elevated);
+    color: #ffffff;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    padding: 6px 12px;
+    font-family: var(--font-body);
+    font-size: 0.82rem;
+    font-weight: 600;
+    outline: none;
+    cursor: pointer;
+    transition: border-color 0.2s ease;
+  }
+
+  .backend-filter-select:focus, .backend-filter-input:focus {
+    border-color: var(--accent-red);
   }
 
   @media (min-width: 768px) {

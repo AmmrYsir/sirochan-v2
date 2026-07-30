@@ -24,6 +24,20 @@ export interface AnimeEpisode {
   watchProgressPercent?: number;
 }
 
+export interface SourceFilterOption {
+  value: string;
+  label: string;
+}
+
+export interface SourceFilter {
+  key: string;
+  label: string;
+  type: string;
+  options?: SourceFilterOption[];
+  defaultValue?: any;
+  placeholder?: string;
+}
+
 export interface MediaSource {
   id: string;
   name: string;
@@ -35,6 +49,8 @@ export interface MediaSource {
   pingMs: number;
   itemCount: string; // e.g. '45,000+'
   description: string;
+  filters?: SourceFilter[];
+  categories?: string[];
 }
 
 export interface MediaItem {

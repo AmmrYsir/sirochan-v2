@@ -30,8 +30,13 @@ const mediaList = allItems.map(item => {
   };
 });
 
-const rawGenres = mediaList.flatMap(m => m.genres || []);
-const genres = ['All', ...Array.from(new Set(rawGenres)).filter(Boolean).sort()];
+const manifestCategories = sources.flatMap(s => s.categories || []);
+const itemGenres = mediaList.flatMap(m => m.genres || []);
+const combinedGenres = Array.from(new Set([...manifestCategories, ...itemGenres]))
+  .filter(g => g && !g.toLowerCase().includes('all'))
+  .sort();
+
+const genres = ['All', ...combinedGenres];
 ---
 
 <MainLayout title="Discover Sources - Sirochan" activeTab="discover">

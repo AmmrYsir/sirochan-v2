@@ -18,6 +18,8 @@ function setCached(key: string, data: any, ttlMs = 60000) {
   memoryCache.set(key, { data, expiry: Date.now() + ttlMs });
 }
 
+import type { SourceFilter } from '../types';
+
 export interface SourceManifest {
   id: string;
   name: string;
@@ -32,6 +34,10 @@ export interface SourceManifest {
     titleDetails: boolean;
     favorites: boolean;
     tagAutocomplete: boolean;
+  };
+  browseConfig?: {
+    supportsPagination?: boolean;
+    filters?: SourceFilter[];
   };
 }
 
@@ -125,18 +131,28 @@ export class ApiService {
       if (!res.ok) throw new Error(`HTTP error ${res.status}`);
       const manifests: SourceManifest[] = await res.json();
 
-      const result: MediaSource[] = manifests.map(m => ({
-        id: m.id,
-        name: m.name,
-        type: m.supportedMediaTypes.includes('anime') && m.supportedMediaTypes.includes('manga') ? 'dual' : m.supportedMediaTypes[0] || 'manga',
-        language: 'EN',
-        icon: m.iconUrl || (m.supportedMediaTypes.includes('manga') ? '📚' : '⚡'),
-        isPinned: true,
-        status: 'ONLINE',
-        pingMs: 18,
-        itemCount: '10,000+',
-        description: m.description
-      }));
+      const result: MediaSource[] = manifests.map(m => {
+        const filters = m.browseConfig?.filters || [];
+        const categoryFilter = filters.find(f => f.key === 'category' || f.key === 'genre' || f.key === 'type');
+        const categories = categoryFilter?.options
+          ?.map(opt => opt.label)
+          .filter(label => label && !label.toLowerCase().includes('all')) || [];
+
+        return {
+          id: m.id,
+          name: m.name,
+          type: m.supportedMediaTypes.includes('anime') && m.supportedMediaTypes.includes('manga') ? 'dual' : m.supportedMediaTypes[0] || 'manga',
+          language: 'EN',
+          icon: m.iconUrl || (m.supportedMediaTypes.includes('manga') ? '📚' : '⚡'),
+          isPinned: true,
+          status: 'ONLINE',
+          pingMs: 18,
+          itemCount: '10,000+',
+          description: m.description,
+          filters: filters,
+          categories: categories
+        };
+      });
 
       setCached(cacheKey, result, 120000);
       return result;
@@ -161,10 +177,38 @@ export class ApiService {
   }
 
   /**
-   * Browse or search title catalog of a specific adapter
+   * Fetch detailed manifest for a specific source adapter
    */
-  static async browseSource(sourceId: string, query?: string, page = 1): Promise<SourceBrowseResult> {
-    const cacheKey = `browse:${sourceId}:${query || 'all'}:${page}`;
+  static async getSourceManifest(sourceId: string): Promise<SourceManifest | null> {
+    const cacheKey = `manifest:${sourceId}`;
+    const cached = getCached<SourceManifest>(cacheKey);
+    if (cached) return cached;
+
+    try {
+      const res = await fetch(`${BASE_URL}/api/v1/sources/${sourceId}`, {
+        signal: AbortSignal.timeout(4000)
+      });
+      if (!res.ok) throw new Error(`HTTP error ${res.status}`);
+      const manifest: SourceManifest = await res.json();
+      setCached(cacheKey, manifest, 300000);
+      return manifest;
+    } catch (err) {
+      console.error(`[ApiService] Error fetching manifest for '${sourceId}':`, err);
+      return null;
+    }
+  }
+
+  /**
+   * Browse or search title catalog of a specific adapter with optional backend filter dict
+   */
+  static async browseSource(
+    sourceId: string,
+    query?: string,
+    page = 1,
+    filters: Record<string, any> = {}
+  ): Promise<SourceBrowseResult> {
+    const filterKey = JSON.stringify(filters);
+    const cacheKey = `browse:${sourceId}:${query || 'all'}:${page}:${filterKey}`;
     const cached = getCached<SourceBrowseResult>(cacheKey);
     if (cached) return cached;
 
@@ -172,7 +216,7 @@ export class ApiService {
       const res = await fetch(`${BASE_URL}/api/v1/sources/${sourceId}/browse`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: query || null, page }),
+        body: JSON.stringify({ query: query || null, page, filters }),
         signal: AbortSignal.timeout(4000)
       });
       if (!res.ok) throw new Error(`HTTP error ${res.status}`);
