@@ -28,12 +28,14 @@ Agents must respect the multi-service architecture of Sirochan v2:
 | **Frontend / App** | `http://localhost:4321` | Astro 7 SSR application, UI components, API routes |
 | **Loouwd Core** | `http://localhost:8000` | FastAPI adapter registry for manga pages, anime video playback, search |
 | **SushiGuard Auth** | `http://localhost:3000` | Bun + Fastify authentication service (`/api/v1/auth/*`) |
-| **PostgreSQL 16** | `localhost:5432` (`sirochan_db`) | Relational persistence for profiles, library bookmarks, reading progress |
+| **PostgreSQL 16** | `localhost:5433` (`sirochan_db`) | Relational persistence for profiles, library bookmarks, reading progress |
 
 ### Environment Variables (`.env`)
-- `DATABASE_URL`: Connection string for PostgreSQL (`postgresql://sirochan:sirochan_secret@localhost:5432/sirochan_db`).
+- `DATABASE_URL`: Connection string for PostgreSQL (`postgresql://sirochan:sirochan_secret@localhost:5433/sirochan_db`).
 - `LOOUWD_URL`: Microservice URL for media content (`http://localhost:8000`).
 - `AUTH_URL`: Microservice URL for authentication (`http://localhost:3000`).
+
+*Note: Port `5433` is mapped on the host machine to avoid collisions with other local Postgres services running on port `5432`.*
 
 ---
 

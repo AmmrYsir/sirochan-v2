@@ -27,13 +27,13 @@ Sirochan v2 operates as an integrated frontend & local backend orchestrating two
                               ▼
                ┌──────────────────────────────┐
                │    PostgreSQL 16 Database    │
-               │   (Users, Progress, Catalog) │
+               │  (Host 5433 / Container 5432)│
                └──────────────────────────────┘
 ```
 
 1. **Loouwd Microservice Core (`http://localhost:8000`)**: FastAPI multi-source registry providing title catalog feeds, chapter image reader pages, anime HLS/MP4 playback URLs, tag autocompletion, SSE real-time search streams, and health checks.
 2. **SushiGuard Auth Microservice (`http://localhost:3000`)**: Enterprise Bun + Fastify authentication service providing user registration, login, JWT bearer/cookie session management, email verification, API keys, and passkeys.
-3. **PostgreSQL 16 Database**: Orchestrated via Drizzle ORM to persist user reading & watch progress, library bookmarks, custom manga stacks & anime playlists, and local profile preferences.
+3. **PostgreSQL 16 Database**: Orchestrated via Drizzle ORM on host port `5433` to prevent port collisions with other local Postgres instances running on port `5432`.
 
 ---
 
@@ -42,7 +42,7 @@ Sirochan v2 operates as an integrated frontend & local backend orchestrating two
 ### 1. Requirements
 - **Bun** >= 1.2
 - **Node.js** >= 22.12.0
-- **PostgreSQL** 16 (running locally or via Docker)
+- **PostgreSQL** 16 (running locally or via Docker Compose)
 
 ### 2. Environment Setup
 
@@ -53,8 +53,8 @@ cp .env.example .env
 ```
 
 ```env
-# Database connection string
-DATABASE_URL=postgresql://sirochan:sirochan_secret@localhost:5432/sirochan_db
+# Database connection string (Port 5433 avoids conflict with existing local Postgres on 5432)
+DATABASE_URL=postgresql://sirochan:sirochan_secret@localhost:5433/sirochan_db
 
 # Microservice Endpoints
 LOOUWD_URL=http://localhost:8000
@@ -117,13 +117,13 @@ Visit the app at [http://localhost:4321](http://localhost:4321).
 │   │   ├── discover.astro  # Catalog search & genre filters
 │   │   ├── index.astro     # Editorial home feed
 │   │   ├── library.astro   # User bookmark library
-│   │   ├── login.astro     # Japanese Editorial Login & Register UI
+│   │   ├── login.astro     # Japanese Editorial Login UI
 │   │   └── profile.astro   # User statistics & reader preferences
 │   ├── styles/             # Global CSS design tokens
 │   ├── middleware.ts       # Astro JWT session & PostgreSQL profile sync middleware
 │   └── env.d.ts            # Astro App.Locals typing declarations
 ├── .env.example            # Environment variables template
-├── docker-compose.yml      # Local Docker container orchestrator
+├── docker-compose.yml      # Local Docker container orchestrator (Postgres on port 5433)
 ├── drizzle.config.ts       # Drizzle Kit configuration
 └── package.json            # Project dependencies & scripts
 ```
