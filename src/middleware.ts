@@ -140,8 +140,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
             hoursWatched: localUser.hoursWatched,
             readingStreakDays: localUser.readingStreakDays,
             preferredReaderMode: localUser.preferredReaderMode,
-            preferredStreamQuality: localUser.preferredStreamQuality,
-            autoSkipIntro: localUser.autoSkipIntro
+            preferredStreamQuality: localUser.preferredStreamQuality
           };
         }
       } catch (dbErr) {

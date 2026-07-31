@@ -20,7 +20,6 @@ export const POST: APIRoute = async ({ request, locals }) => {
       title,
       type,
       folder = 'bookmarks',
-      userRating,
       action = 'add' // 'add' | 'remove'
     } = body;
 

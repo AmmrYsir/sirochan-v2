@@ -1,7 +1,7 @@
 import type { APIRoute } from 'astro';
 import { db } from '../../../db/client';
 import { userProgress, media } from '../../../db/schema';
-import { eq, and } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 
 export const POST: APIRoute = async ({ request, locals }) => {
   if (!locals.user) {
@@ -22,10 +22,8 @@ export const POST: APIRoute = async ({ request, locals }) => {
       contentType, // 'chapter' | 'episode'
       contentId,
       contentNumber,
-      lastPageNumber = 1,
       timeMarkerSeconds = 0,
-      progressPercent = 0,
-      completed = false
+      progressPercent = 0
     } = body;
 
     if (!mediaId || !contentType || !contentId) {
