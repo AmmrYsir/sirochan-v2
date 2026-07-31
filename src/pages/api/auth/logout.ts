@@ -8,8 +8,9 @@ export const POST: APIRoute = async ({ cookies }) => {
     await AuthClient.logout(token);
   }
 
-  // Clear cookie
+  // Clear cookies
   cookies.delete('sys_access_token', { path: '/' });
+  cookies.delete('sys_refresh_token', { path: '/' });
 
   return new Response(JSON.stringify({ success: true }), {
     status: 200,

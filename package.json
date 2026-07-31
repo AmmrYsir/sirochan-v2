@@ -8,6 +8,7 @@
   "scripts": {
     "dev": "astro dev",
     "build": "astro build",
+    "start": "bun ./dist/server/entry.mjs",
     "preview": "astro preview",
     "astro": "astro",
     "db:generate": "drizzle-kit generate",

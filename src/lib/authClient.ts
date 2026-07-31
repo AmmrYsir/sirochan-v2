@@ -36,13 +36,32 @@ function parseErrorMessage(data: any, fallbackMessage: string): string {
   return fallbackMessage;
 }
 
+async function fetchAuth(path: string, options?: RequestInit): Promise<Response> {
+  const primaryUrl = `${AUTH_URL}${path}`;
+  try {
+    return await fetch(primaryUrl, options);
+  } catch (err) {
+    if (primaryUrl.includes('localhost') || primaryUrl.includes('127.0.0.1')) {
+      const fallbackUrl = primaryUrl
+        .replace('localhost', 'host.docker.internal')
+        .replace('127.0.0.1', 'host.docker.internal');
+      try {
+        return await fetch(fallbackUrl, options);
+      } catch {
+        throw err;
+      }
+    }
+    throw err;
+  }
+}
+
 export class AuthClient {
   /**
    * Register a new user account with SushiGuard Auth service
    */
-  static async register(name: string, email: string, password: string): Promise<{ user?: AuthUser; token?: string; error?: string }> {
+  static async register(name: string, email: string, password: string): Promise<{ user?: AuthUser; token?: string; refreshToken?: string; error?: string }> {
     try {
-      const res = await fetch(`${AUTH_URL}/api/v1/auth/register`, {
+      const res = await fetchAuth(`/api/v1/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, email, password })
@@ -55,7 +74,8 @@ export class AuthClient {
 
       const user = data.data?.user || data.user;
       const token = data.data?.accessToken || data.token;
-      return { user, token };
+      const refreshToken = data.data?.refreshToken || data.refreshToken;
+      return { user, token, refreshToken };
     } catch (err: any) {
       console.error('[AuthClient] Register error:', err);
       return { error: err.message || 'Connection error to Auth service' };
@@ -65,9 +85,9 @@ export class AuthClient {
   /**
    * Log in user with email & password
    */
-  static async login(email: string, password: string): Promise<{ user?: AuthUser; token?: string; error?: string }> {
+  static async login(email: string, password: string): Promise<{ user?: AuthUser; token?: string; refreshToken?: string; error?: string }> {
     try {
-      const res = await fetch(`${AUTH_URL}/api/v1/auth/login`, {
+      const res = await fetchAuth(`/api/v1/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password })
@@ -80,15 +100,47 @@ export class AuthClient {
 
       const user = data.data?.user || data.user;
       const token = data.data?.accessToken || data.token;
+      const refreshToken = data.data?.refreshToken || data.refreshToken;
 
       if (token && user) {
         // Cache session token for 60 seconds
         tokenCache.set(token, { user, expiry: Date.now() + 60000 });
       }
 
-      return { user, token };
+      return { user, token, refreshToken };
     } catch (err: any) {
       console.error('[AuthClient] Login error:', err);
+      return { error: err.message || 'Connection error to Auth service' };
+    }
+  }
+
+  /**
+   * Refresh expired access token using refresh token
+   */
+  static async refreshToken(refreshToken: string): Promise<{ user?: AuthUser; token?: string; refreshToken?: string; error?: string }> {
+    try {
+      const res = await fetchAuth(`/api/v1/auth/refresh`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refreshToken })
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        return { error: parseErrorMessage(data, `Token refresh failed (${res.status})`) };
+      }
+
+      const user = data.data?.user || data.user;
+      const token = data.data?.accessToken || data.token;
+      const newRefreshToken = data.data?.refreshToken || data.refreshToken || refreshToken;
+
+      if (token && user) {
+        tokenCache.set(token, { user, expiry: Date.now() + 60000 });
+      }
+
+      return { user, token, refreshToken: newRefreshToken };
+    } catch (err: any) {
+      console.error('[AuthClient] Refresh token error:', err);
       return { error: err.message || 'Connection error to Auth service' };
     }
   }
@@ -103,7 +155,7 @@ export class AuthClient {
     }
 
     try {
-      const res = await fetch(`${AUTH_URL}/api/v1/auth/me`, {
+      const res = await fetchAuth(`/api/v1/auth/me`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -143,7 +195,7 @@ export class AuthClient {
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
 
-      const res = await fetch(`${AUTH_URL}/api/v1/auth/logout`, {
+      const res = await fetchAuth(`/api/v1/auth/logout`, {
         method: 'POST',
         headers
       });

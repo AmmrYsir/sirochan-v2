@@ -26,4 +26,4 @@ COPY --from=base /app/public ./public
 
 EXPOSE 4321
 
-CMD ["bun", "run", "preview", "--host", "0.0.0.0", "--port", "4321"]
+CMD ["bun", "./dist/server/entry.mjs"]

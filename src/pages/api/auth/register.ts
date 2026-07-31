@@ -31,6 +31,15 @@ export const POST: APIRoute = async ({ request, cookies }) => {
         secure: false,
         maxAge: 60 * 60 * 24 * 7
       });
+      if (result.refreshToken) {
+        cookies.set('sys_refresh_token', result.refreshToken, {
+          path: '/',
+          httpOnly: true,
+          sameSite: 'lax',
+          secure: false,
+          maxAge: 60 * 60 * 24 * 7
+        });
+      }
     }
 
     return new Response(JSON.stringify({ success: true, user: result.user }), {
