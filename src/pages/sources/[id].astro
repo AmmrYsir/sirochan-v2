@@ -257,7 +257,7 @@ const popularItems = sourceMedia.slice(0, 4);
     if (gridContainer) gridContainer.style.opacity = '0.4';
 
     try {
-      const res = await fetch(`http://localhost:8000/api/v1/sources/${sourceId}/browse`, {
+      const res = await fetch(`/api/sources/${sourceId}/browse`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query, page: 1, filters })

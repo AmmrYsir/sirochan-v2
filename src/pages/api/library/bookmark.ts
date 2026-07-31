@@ -61,15 +61,11 @@ export const POST: APIRoute = async ({ request, locals }) => {
     await db.insert(bookmarks).values({
       userId: locals.user.id,
       mediaId,
-      folder,
-      userRating: userRating || null,
-      updatedAt: new Date()
+      folder
     }).onConflictDoUpdate({
       target: [bookmarks.userId, bookmarks.mediaId],
       set: {
-        folder,
-        userRating: userRating || null,
-        updatedAt: new Date()
+        folder
       }
     });
 

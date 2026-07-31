@@ -111,7 +111,6 @@ export const onRequest = defineMiddleware(async (context, next) => {
         if (!localUser) {
           const inserted = await db.insert(users).values({
             id: authUser.id,
-            email: authUser.email,
             username: authUser.name || authUser.email?.split('@')[0] || 'User',
             handle: handle,
             avatar: authUser.avatar || `https://api.dicebear.com/7.x/bottts/svg?seed=${authUser.id}`,
@@ -119,12 +118,10 @@ export const onRequest = defineMiddleware(async (context, next) => {
             hoursWatched: 0,
             readingStreakDays: 1,
             preferredReaderMode: 'continuous',
-            preferredStreamQuality: '1080p',
-            autoSkipIntro: true
+            preferredStreamQuality: '1080p'
           }).onConflictDoUpdate({
             target: users.id,
             set: {
-              email: authUser.email,
               username: authUser.name || authUser.email?.split('@')[0] || 'User',
               updatedAt: new Date()
             }

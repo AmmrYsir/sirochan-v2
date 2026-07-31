@@ -61,10 +61,8 @@ export const POST: APIRoute = async ({ request, locals }) => {
       contentType,
       contentId,
       contentNumber: contentNumber || 1,
-      lastPageNumber,
       timeMarkerSeconds,
       progressPercent,
-      completed,
       lastReadOrWatchedAt: new Date()
     }).onConflictDoUpdate({
       target: userProgress.id,
@@ -72,10 +70,8 @@ export const POST: APIRoute = async ({ request, locals }) => {
         contentType,
         contentId,
         contentNumber: contentNumber || 1,
-        lastPageNumber,
         timeMarkerSeconds,
         progressPercent,
-        completed,
         lastReadOrWatchedAt: new Date()
       }
     });
