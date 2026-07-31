@@ -31,8 +31,8 @@ Sirochan v2 operates as an integrated frontend & local backend orchestrating two
                └──────────────────────────────┘
 ```
 
-1. **Loouwd Microservice Core (`http://localhost:8000`)**: FastAPI multi-source registry providing title catalog feeds, chapter image reader pages, anime HLS/MP4 playback URLs, tag autocompletion, SSE real-time search streams, and health checks.
-2. **SushiGuard Auth Microservice (`http://localhost:3000`)**: Enterprise Bun + Fastify authentication service providing user registration, login, JWT bearer/cookie session management, email verification, API keys, and passkeys.
+1. **Loouwd Microservice Core (`LOOUWD_URL`)**: FastAPI multi-source registry providing title catalog feeds, chapter image reader pages, anime HLS/MP4 playback URLs, tag autocompletion, SSE real-time search streams, and health checks.
+2. **SushiGuard Auth Microservice (`AUTH_URL`)**: Enterprise Bun + Fastify authentication service providing user registration, login, JWT bearer/cookie session management (`sys_access_token` and 7-day `sys_refresh_token` automatic token renewal), email verification, API keys, and passkeys.
 3. **PostgreSQL 16 Database**: Orchestrated via Drizzle ORM on host port `5433` to prevent port collisions with other local Postgres instances running on port `5432`.
 
 ---
@@ -56,9 +56,9 @@ cp .env.example .env
 # Database connection string (Port 5433 avoids conflict with existing local Postgres on 5432)
 DATABASE_URL=postgresql://sirochan:sirochan_secret@localhost:5433/sirochan_db
 
-# Microservice Endpoints
-LOOUWD_URL=http://localhost:8000
-AUTH_URL=http://localhost:3000
+# Microservice Endpoints (Use host.docker.internal when app runs in Docker and services are on host)
+LOOUWD_URL=http://host.docker.internal:8000
+AUTH_URL=http://host.docker.internal:3000
 ```
 
 ### 3. Install Dependencies & Push DB Schema
@@ -83,7 +83,9 @@ Visit the app at [http://localhost:4321](http://localhost:4321).
 | Command | Action |
 | :--- | :--- |
 | `bun dev` | Starts local dev server at `localhost:4321` |
+| `bun astro check` | Runs full TypeScript diagnostic check across all components |
 | `bun run build` | Builds the production SSR bundle to `./dist/` |
+| `bun run start` | Runs production SSR standalone server entrypoint (`dist/server/entry.mjs`) |
 | `bun run preview` | Previews production build locally |
 | `bun run db:generate` | Generates new Drizzle ORM SQL migration files |
 | `bun run db:push` | Pushes current `schema.ts` directly to PostgreSQL database |

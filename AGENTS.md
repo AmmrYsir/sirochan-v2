@@ -32,8 +32,8 @@ Agents must respect the multi-service architecture of Sirochan v2:
 
 ### Environment Variables (`.env`)
 - `DATABASE_URL`: Connection string for PostgreSQL (`postgresql://sirochan:sirochan_secret@localhost:5433/sirochan_db`).
-- `LOOUWD_URL`: Microservice URL for media content (`http://localhost:8000`).
-- `AUTH_URL`: Microservice URL for authentication (`http://localhost:3000`).
+- `LOOUWD_URL`: Microservice URL for media content (`http://localhost:8000` on host, or `http://host.docker.internal:8000` when running app in Docker).
+- `AUTH_URL`: Microservice URL for authentication (`http://localhost:3000` on host, or `http://host.docker.internal:3000` when running app in Docker).
 
 *Note: Port `5433` is mapped on the host machine to avoid collisions with other local Postgres services running on port `5432`.*
 
@@ -44,25 +44,32 @@ Agents must respect the multi-service architecture of Sirochan v2:
 All database operations must use Drizzle ORM defined in `src/db/schema.ts` and initialized via `src/db/client.ts`.
 
 ### Core Tables Summary
-1. `users`: Synchronized profile table mapped to Auth `userId` (`email`, `username`, `handle`, `chaptersRead`, `hoursWatched`, `preferredReaderMode`, `preferredStreamQuality`).
+1. `users`: Synchronized profile table mapped to Auth `userId` (`username`, `handle`, `avatar`, `chaptersRead`, `hoursWatched`, `readingStreakDays`, `preferredReaderMode`, `preferredStreamQuality`).
 2. `media`: Cached catalog metadata for manga/anime titles (`sourceId`, `sourceTitleId`, `title`, `type`, `coverImage`, `bannerImage`, `genres`, `rating`).
 3. `chapters`: Manga chapter catalog cache (`mediaId`, `chapterNumber`, `title`, `pageCount`).
 4. `episodes`: Anime episode catalog cache (`mediaId`, `episodeNumber`, `title`, `durationSeconds`).
-5. `user_progress`: Combined real-time read/watch progress (`userId`, `mediaId`, `contentType`, `contentId`, `lastPageNumber`, `timeMarkerSeconds`, `progressPercent`, `completed`).
+5. `user_progress`: Combined real-time read/watch progress (`userId`, `mediaId`, `contentType`, `contentId`, `contentNumber`, `timeMarkerSeconds`, `progressPercent`, `lastReadOrWatchedAt`).
 6. `bookmarks`: User library bookmarks across folders (`reading`, `watching`, `plan_to_read`, `plan_to_watch`, `completed`, `favorites`).
 7. `custom_lists` & `custom_list_items`: Manga stacks & anime playlists.
 8. `comments` & `comment_reactions`: Episode and chapter community discussion system.
 
-### Database Commands
+### Database & Quality Commands
 - `bun run db:generate`: Create SQL migration file from updated `schema.ts`.
 - `bun run db:push`: Synchronize schema directly with PostgreSQL database.
+- `bun astro check`: Run TypeScript diagnostic check across all 39+ Astro components & TypeScript files.
 
 ---
 
 ## 🔑 Authentication & Strict Authorization Rules
 
-- **Token Extraction**: `src/middleware.ts` extracts JWT tokens from either `sys_access_token` HTTP-only cookies or `Authorization: Bearer <token>` HTTP headers on every incoming request.
-- **Session Validation & DB Sync**: Validates token with `AuthClient.getMe(token)` against `http://localhost:3000/api/v1/auth/me`, auto-syncs user profile records in PostgreSQL `users` table, and attaches the profile to `Astro.locals.user`.
+- **Dual Cookie & 7-Day Refresh Architecture**:
+  - `sys_access_token`: Short-lived access token (15-minute expiration).
+  - `sys_refresh_token`: Long-lived refresh token (7-day expiration limit).
+- **Automatic SSR Token Renewal**:
+  - `src/middleware.ts` extracts `sys_access_token` and `sys_refresh_token` HTTP-only cookies on every request.
+  - If `sys_access_token` is expired but `sys_refresh_token` is valid, `middleware.ts` transparently calls `AuthClient.refreshToken(refreshToken)` (`POST /api/v1/auth/refresh`), updates access cookies, and keeps the user logged in seamlessly.
+  - If `sys_refresh_token` is expired (> 7 days) or invalid, cookies are cleared and the user is redirected to `/login`.
+- **Session Validation & DB Sync**: Validates active access token with `AuthClient.getMe(token)` against `AUTH_URL`, auto-syncs user profile records in PostgreSQL `users` table, and attaches profile to `Astro.locals.user`.
 - **Strict Route Protection**:
   - **Whitelisted Public Routes**: `/login`, `/api/auth/*`, and static assets (`/_astro/*`, images, scripts).
   - **Protected Page Routes** (`/`, `/discover`, `/library`, `/profile`, `/manga/*`, `/anime/*`, etc.): Unauthenticated visitors are automatically redirected to `/login` (302 Redirect).
