@@ -3,13 +3,13 @@ import MainLayout from '../layouts/MainLayout.astro';
 
 const user = Astro.locals.user;
 
-// Redirect logged in user to homepage or profile
+// Redirect logged in user to homepage
 if (user) {
-  return Astro.redirect('/profile');
+  return Astro.redirect('/');
 }
 ---
 
-<MainLayout title="Sign In & Register - Sirochan" activeTab="profile" hideNav={false}>
+<MainLayout title="Sign In - Sirochan" activeTab="profile" hideNav={true}>
   <div class="auth-page-container">
     <div class="auth-card">
       <!-- Card Header -->
@@ -18,18 +18,8 @@ if (user) {
           <span class="badge-dot"></span>
           <span class="badge-text">SIROCHAN EDITORIAL AUTH</span>
         </div>
-        <h1 class="auth-title">WELCOME BACK</h1>
+        <h1 class="auth-title">SIGN IN</h1>
         <p class="auth-subtitle">Sign in to sync your manga reading and anime watch history across devices.</p>
-      </div>
-
-      <!-- Tab Switcher -->
-      <div class="auth-tab-row">
-        <button id="tab-login" class="auth-tab active" type="button">
-          SIGN IN
-        </button>
-        <button id="tab-register" class="auth-tab" type="button">
-          REGISTER
-        </button>
       </div>
 
       <!-- Error Alert Message -->
@@ -42,7 +32,7 @@ if (user) {
         <span id="auth-error-text">Authentication error occurred</span>
       </div>
 
-      <!-- LOGIN FORM -->
+      <!-- LOGIN FORM ONLY -->
       <form id="login-form" class="auth-form">
         <div class="form-group">
           <label for="login-email" class="form-label">EMAIL ADDRESS</label>
@@ -73,51 +63,7 @@ if (user) {
 
         <button type="submit" id="login-submit-btn" class="btn-primary">
           <span class="btn-text">SIGN IN</span>
-          <span class="btn-spinner" style="display: none;">LOADING...</span>
-        </button>
-      </form>
-
-      <!-- REGISTER FORM -->
-      <form id="register-form" class="auth-form" style="display: none;">
-        <div class="form-group">
-          <label for="register-name" class="form-label">DISPLAY NAME</label>
-          <input 
-            type="text" 
-            id="register-name" 
-            name="name" 
-            class="form-input" 
-            placeholder="Arata Kasuga" 
-            required 
-          />
-        </div>
-
-        <div class="form-group">
-          <label for="register-email" class="form-label">EMAIL ADDRESS</label>
-          <input 
-            type="email" 
-            id="register-email" 
-            name="email" 
-            class="form-input" 
-            placeholder="arata@sirochan.app" 
-            required 
-          />
-        </div>
-
-        <div class="form-group">
-          <label for="register-password" class="form-label">PASSWORD</label>
-          <input 
-            type="password" 
-            id="register-password" 
-            name="password" 
-            class="form-input" 
-            placeholder="Min 8 chars with 1 uppercase & 1 number" 
-            required 
-          />
-        </div>
-
-        <button type="submit" id="register-submit-btn" class="btn-primary">
-          <span class="btn-text">CREATE ACCOUNT</span>
-          <span class="btn-spinner" style="display: none;">CREATING...</span>
+          <span class="btn-spinner" style="display: none;">AUTHENTICATING...</span>
         </button>
       </form>
 
@@ -133,16 +79,21 @@ if (user) {
 
 <script>
   document.addEventListener('DOMContentLoaded', () => {
-    const tabLogin = document.getElementById('tab-login');
-    const tabRegister = document.getElementById('tab-register');
     const loginForm = document.getElementById('login-form') as HTMLFormElement;
-    const registerForm = document.getElementById('register-form') as HTMLFormElement;
     const errorAlert = document.getElementById('auth-error-alert');
     const errorText = document.getElementById('auth-error-text');
 
-    function showError(msg: string) {
+    function showError(msg: any) {
       if (errorAlert && errorText) {
-        errorText.textContent = msg;
+        let displayMsg = 'Authentication failed. Please check your credentials.';
+
+        if (typeof msg === 'string') {
+          displayMsg = msg;
+        } else if (msg && typeof msg === 'object') {
+          displayMsg = msg.message || msg.error || JSON.stringify(msg);
+        }
+
+        errorText.textContent = displayMsg;
         errorAlert.style.display = 'flex';
       }
     }
@@ -152,23 +103,6 @@ if (user) {
         errorAlert.style.display = 'none';
       }
     }
-
-    // Switch Tabs
-    tabLogin?.addEventListener('click', () => {
-      tabLogin.classList.add('active');
-      tabRegister?.classList.remove('active');
-      loginForm.style.display = 'flex';
-      registerForm.style.display = 'none';
-      hideError();
-    });
-
-    tabRegister?.addEventListener('click', () => {
-      tabRegister.classList.add('active');
-      tabLogin?.classList.remove('active');
-      registerForm.style.display = 'flex';
-      loginForm.style.display = 'none';
-      hideError();
-    });
 
     // Handle Login Submit
     loginForm?.addEventListener('submit', async (e) => {
@@ -199,49 +133,10 @@ if (user) {
         if (!res.ok) {
           showError(data.error || 'Login failed. Please check credentials.');
         } else {
-          window.location.href = '/';
-        }
-      } catch (err: any) {
-        showError('Network error connecting to Auth service.');
-      } finally {
-        if (btnText && btnSpinner) {
-          btnText.style.display = 'inline';
-          btnSpinner.style.display = 'none';
-          btn.disabled = false;
-        }
-      }
-    });
-
-    // Handle Register Submit
-    registerForm?.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      hideError();
-
-      const btn = document.getElementById('register-submit-btn') as HTMLButtonElement;
-      const btnText = btn?.querySelector('.btn-text') as HTMLElement;
-      const btnSpinner = btn?.querySelector('.btn-spinner') as HTMLElement;
-
-      const name = (document.getElementById('register-name') as HTMLInputElement).value;
-      const email = (document.getElementById('register-email') as HTMLInputElement).value;
-      const password = (document.getElementById('register-password') as HTMLInputElement).value;
-
-      if (btnText && btnSpinner) {
-        btnText.style.display = 'none';
-        btnSpinner.style.display = 'inline';
-        btn.disabled = true;
-      }
-
-      try {
-        const res = await fetch('/api/auth/register', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, email, password })
-        });
-
-        const data = await res.json();
-        if (!res.ok) {
-          showError(data.error || 'Registration failed.');
-        } else {
+          // Set client-side cookie as fallback for maximum browser persistence
+          if (data.token) {
+            document.cookie = `sys_access_token=${data.token}; path=/; max-age=604800; SameSite=Lax`;
+          }
           window.location.href = '/';
         }
       } catch (err: any) {
@@ -262,19 +157,19 @@ if (user) {
     display: flex;
     align-items: center;
     justify-content: center;
-    min-height: calc(100vh - 120px);
+    min-height: 100vh;
     padding: 24px 16px;
     background-color: var(--bg-deep);
-    background-image: radial-gradient(circle at 50% 20%, rgba(230, 57, 70, 0.08) 0%, transparent 60%);
+    background-image: radial-gradient(circle at 50% 30%, rgba(230, 57, 70, 0.08) 0%, transparent 70%);
   }
 
   .auth-card {
     width: 100%;
-    max-width: 440px;
+    max-width: 420px;
     background-color: var(--bg-surface, #121212);
     border: 1px solid var(--border-subtle, #2A2A2A);
     border-radius: 16px;
-    padding: 32px 28px;
+    padding: 36px 30px;
     box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6);
     display: flex;
     flex-direction: column;
@@ -330,36 +225,6 @@ if (user) {
     margin: 0;
   }
 
-  /* Tab Switcher */
-  .auth-tab-row {
-    display: flex;
-    border-bottom: 1px solid #2A2A2A;
-  }
-
-  .auth-tab {
-    flex: 1;
-    padding: 12px;
-    background: none;
-    border: none;
-    border-bottom: 2px solid transparent;
-    font-family: var(--font-mono);
-    font-size: 0.8rem;
-    font-weight: 700;
-    letter-spacing: 0.05em;
-    color: #A0A0A0;
-    cursor: pointer;
-    transition: all 0.2s ease;
-  }
-
-  .auth-tab.active {
-    color: #FFFFFF;
-    border-bottom-color: #E63946;
-  }
-
-  .auth-tab:hover:not(.active) {
-    color: #FFFFFF;
-  }
-
   /* Error Alert */
   .auth-alert {
     display: flex;
@@ -371,13 +236,14 @@ if (user) {
     border-radius: 8px;
     color: #FFB4AB;
     font-size: 0.84rem;
+    word-break: break-word;
   }
 
-  /* Forms */
+  /* Form */
   .auth-form {
     display: flex;
     flex-direction: column;
-    gap: 18px;
+    gap: 20px;
   }
 
   .form-group {

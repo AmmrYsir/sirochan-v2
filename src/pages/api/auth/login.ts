@@ -31,7 +31,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       maxAge: 60 * 60 * 24 * 7 // 7 days
     });
 
-    return new Response(JSON.stringify({ success: true, user: result.user }), {
+    return new Response(JSON.stringify({ success: true, user: result.user, token: result.token }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' }
     });

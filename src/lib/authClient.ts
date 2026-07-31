@@ -9,15 +9,31 @@ export interface AuthUser {
   createdAt?: string;
 }
 
-export interface AuthResponse {
-  success?: boolean;
-  data?: {
-    user?: AuthUser;
-    accessToken?: string;
-    refreshToken?: string;
-  };
-  error?: string;
-  message?: string;
+// In-memory session cache to prevent hitting Auth service rate-limits on SSR requests
+const tokenCache = new Map<string, { user: AuthUser; expiry: number }>();
+
+function parseErrorMessage(data: any, fallbackMessage: string): string {
+  if (!data) return fallbackMessage;
+
+  if (typeof data.message === 'string') return data.message;
+  if (typeof data.error === 'string') return data.error;
+
+  if (data.message && typeof data.message === 'object') {
+    if (typeof data.message.message === 'string') return data.message.message;
+    return JSON.stringify(data.message);
+  }
+
+  if (data.error && typeof data.error === 'object') {
+    if (typeof data.error.message === 'string') return data.error.message;
+    return JSON.stringify(data.error);
+  }
+
+  if (Array.isArray(data.errors) && data.errors.length > 0) {
+    const first = data.errors[0];
+    return typeof first === 'string' ? first : (first.message || JSON.stringify(first));
+  }
+
+  return fallbackMessage;
 }
 
 export class AuthClient {
@@ -34,7 +50,7 @@ export class AuthClient {
 
       const data = await res.json();
       if (!res.ok) {
-        return { error: data.message || data.error || `Registration failed (${res.status})` };
+        return { error: parseErrorMessage(data, `Registration failed (${res.status})`) };
       }
 
       const user = data.data?.user || data.user;
@@ -59,11 +75,17 @@ export class AuthClient {
 
       const data = await res.json();
       if (!res.ok) {
-        return { error: data.message || data.error || 'Invalid email or password' };
+        return { error: parseErrorMessage(data, 'Invalid email or password') };
       }
 
       const user = data.data?.user || data.user;
       const token = data.data?.accessToken || data.token;
+
+      if (token && user) {
+        // Cache session token for 60 seconds
+        tokenCache.set(token, { user, expiry: Date.now() + 60000 });
+      }
+
       return { user, token };
     } catch (err: any) {
       console.error('[AuthClient] Login error:', err);
@@ -72,9 +94,14 @@ export class AuthClient {
   }
 
   /**
-   * Get current authenticated user details using Bearer token
+   * Get current authenticated user details using Bearer token with in-memory caching
    */
   static async getMe(token: string): Promise<AuthUser | null> {
+    const cached = tokenCache.get(token);
+    if (cached && cached.expiry > Date.now()) {
+      return cached.user;
+    }
+
     try {
       const res = await fetch(`${AUTH_URL}/api/v1/auth/me`, {
         headers: {
@@ -82,19 +109,36 @@ export class AuthClient {
         }
       });
 
-      if (!res.ok) return null;
+      if (!res.ok) {
+        tokenCache.delete(token);
+        return null;
+      }
+
       const data = await res.json();
-      return data.data?.user || data.user || null;
+      const user = data.data?.user || data.user || null;
+
+      if (user) {
+        tokenCache.set(token, { user, expiry: Date.now() + 60000 });
+      }
+
+      return user;
     } catch (err) {
       console.error('[AuthClient] getMe error:', err);
-      return null;
+      // Return cached user if network fails temporarily
+      return cached?.user || null;
     }
   }
 
   /**
-   * Log out user
+   * Log out user and clear token cache
    */
   static async logout(token?: string): Promise<boolean> {
+    if (token) {
+      tokenCache.delete(token);
+    } else {
+      tokenCache.clear();
+    }
+
     try {
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (token) headers['Authorization'] = `Bearer ${token}`;
@@ -108,6 +152,17 @@ export class AuthClient {
     } catch (err) {
       console.error('[AuthClient] Logout error:', err);
       return false;
+    }
+  }
+
+  /**
+   * Invalidate session cache
+   */
+  static clearCache(token?: string) {
+    if (token) {
+      tokenCache.delete(token);
+    } else {
+      tokenCache.clear();
     }
   }
 }

@@ -3,6 +3,9 @@ import MainLayout from '../../layouts/MainLayout.astro';
 import Button from '../../components/common/Button.astro';
 import Badge from '../../components/common/Badge.astro';
 import { ApiService } from '../../db/apiService';
+import { db } from '../../db/client';
+import { bookmarks } from '../../db/schema';
+import { eq, and } from 'drizzle-orm';
 import { MANGA_PLACEHOLDER, ANIME_PLACEHOLDER } from '../../utils/placeholders';
 
 
@@ -18,7 +21,7 @@ function formatHumanDate(dateStr?: string | null): string | null {
 
   if (diffHours >= 0 && diffHours < 1) return 'Just now';
   if (diffHours >= 1 && diffHours < 24) return `${diffHours}h ago`;
-  if (diffDays >= 1 && diffDays < 7) return `${diffDays}d ago`;
+  if (diffDays >= 1 && diffDays < 24) return `${diffDays}d ago`;
   if (diffDays >= 7 && diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`;
 
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
@@ -26,6 +29,7 @@ function formatHumanDate(dateStr?: string | null): string | null {
 
 const sourceId = Astro.params.sourceId || 'mangadex';
 const id = Astro.params.id || 'title';
+const user = Astro.locals.user;
 
 // Direct 1-shot API call to microservice adapter!
 let liveTitleDetails = await ApiService.getTitleDetails(sourceId, id);
@@ -79,6 +83,23 @@ const item = liveTitleDetails ? {
   humanDate: null
 };
 
+const mediaId = `${sourceId}:${item.id}`;
+let isBookmarked = false;
+
+if (user) {
+  try {
+    const existingBookmark = await db.query.bookmarks.findFirst({
+      where: and(
+        eq(bookmarks.userId, user.id),
+        eq(bookmarks.mediaId, mediaId)
+      )
+    });
+    if (existingBookmark) isBookmarked = true;
+  } catch (err) {
+    console.error('Error fetching user bookmark:', err);
+  }
+}
+
 const count = liveTitleDetails?.totalChapters || liveTitleDetails?.totalEpisodes || liveTitleDetails?.contentSummary?.totalCount || 1;
 const chapters = Array.from({ length: count }, (_, i) => ({
   id: `${item.id}-ch-${count - i}`,
@@ -120,6 +141,22 @@ const chapters = Array.from({ length: count }, (_, i) => ({
           >
             {item.type === 'anime' ? 'STREAM EPISODE 1' : 'READ FIRST CH.'}
           </Button>
+
+          <!-- Interactive Bookmark Button -->
+          <button 
+            id="bookmark-btn" 
+            class={`bookmark-action-btn ${isBookmarked ? 'bookmarked' : ''}`}
+            data-media-id={mediaId}
+            data-source-id={sourceId}
+            data-title={item.title}
+            data-type={item.type}
+            data-bookmarked={isBookmarked ? 'true' : 'false'}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill={isBookmarked ? 'currentColor' : 'none'} stroke="currentColor" stroke-width="2">
+              <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
+            </svg>
+            <span id="bookmark-btn-text">{isBookmarked ? 'IN LIBRARY' : 'ADD TO BOOKMARKS'}</span>
+          </button>
         </div>
 
         <!-- Meta & Overview -->
@@ -195,6 +232,54 @@ const chapters = Array.from({ length: count }, (_, i) => ({
 <script>
   const sortBtns = document.querySelectorAll('.sort-pill');
   const container = document.getElementById('chapters-container');
+  const bookmarkBtn = document.getElementById('bookmark-btn');
+  const bookmarkText = document.getElementById('bookmark-btn-text');
+
+  if (bookmarkBtn) {
+    bookmarkBtn.addEventListener('click', async () => {
+      const isBookmarked = bookmarkBtn.getAttribute('data-bookmarked') === 'true';
+      const mediaId = bookmarkBtn.getAttribute('data-media-id');
+      const sourceId = bookmarkBtn.getAttribute('data-source-id');
+      const title = bookmarkBtn.getAttribute('data-title');
+      const type = bookmarkBtn.getAttribute('data-type');
+
+      try {
+        const res = await fetch('/api/library/bookmark', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            mediaId,
+            sourceId,
+            title,
+            type,
+            action: isBookmarked ? 'remove' : 'add'
+          })
+        });
+
+        if (res.status === 401) {
+          window.location.href = '/login';
+          return;
+        }
+
+        const data = await res.json();
+        if (data.success) {
+          const nextState = !isBookmarked;
+          bookmarkBtn.setAttribute('data-bookmarked', nextState ? 'true' : 'false');
+          if (nextState) {
+            bookmarkBtn.classList.add('bookmarked');
+            if (bookmarkText) bookmarkText.textContent = 'IN LIBRARY';
+            bookmarkBtn.querySelector('svg')?.setAttribute('fill', 'currentColor');
+          } else {
+            bookmarkBtn.classList.remove('bookmarked');
+            if (bookmarkText) bookmarkText.textContent = 'ADD TO BOOKMARKS';
+            bookmarkBtn.querySelector('svg')?.setAttribute('fill', 'none');
+          }
+        }
+      } catch (err) {
+        console.error('Error toggling bookmark:', err);
+      }
+    });
+  }
 
   if (container) {
     sortBtns.forEach((btn) => {
@@ -260,7 +345,7 @@ const chapters = Array.from({ length: count }, (_, i) => ({
   .cover-column {
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 12px;
   }
 
   .main-cover {
@@ -274,6 +359,36 @@ const chapters = Array.from({ length: count }, (_, i) => ({
 
   .read-btn {
     width: 100%;
+  }
+
+  .bookmark-action-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    padding: 12px;
+    background-color: var(--bg-surface, #121212);
+    border: 1px solid var(--border-subtle, #2A2A2A);
+    border-radius: var(--radius-md, 12px);
+    color: var(--text-primary, #ffffff);
+    font-family: var(--font-mono, monospace);
+    font-size: 0.78rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .bookmark-action-btn:hover {
+    border-color: #E63946;
+    color: #E63946;
+    background-color: var(--bg-elevated, #1E1E1E);
+  }
+
+  .bookmark-action-btn.bookmarked {
+    border-color: rgba(230, 57, 70, 0.5);
+    background-color: rgba(230, 57, 70, 0.12);
+    color: #E63946;
   }
 
   .info-column {
