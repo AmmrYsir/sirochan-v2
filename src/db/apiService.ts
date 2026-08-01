@@ -145,8 +145,11 @@ export class ApiService {
 					?.map(opt => opt.label)
 					.filter(label => label && !label.toLowerCase().includes('all')) || [];
 
-				const rawIcon = m.iconUrl ? m.iconUrl.replace(/host\.docker\.internal/gi, 'localhost') : '';
-				const icon = rawIcon || (m.supportedMediaTypes.includes('manga') ? '📚' : '⚡');
+				let icon = m.supportedMediaTypes.includes('manga') ? '📚' : '⚡';
+				if (m.iconUrl && (m.iconUrl.startsWith('http') || m.iconUrl.startsWith('/'))) {
+					const cleanUrl = m.iconUrl.replace(/host\.docker\.internal/gi, 'localhost');
+					icon = `/api/proxy/image?url=${encodeURIComponent(cleanUrl)}`;
+				}
 
 				return {
 					id: m.id,

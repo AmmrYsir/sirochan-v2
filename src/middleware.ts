@@ -156,7 +156,8 @@ export const onRequest = defineMiddleware(async (context, next) => {
   // Public unauthenticated routes
   const isPublicRoute =
     pathname === '/login' ||
-    pathname.startsWith('/api/auth/');
+    pathname.startsWith('/api/auth/') ||
+    pathname.startsWith('/api/proxy/');
 
   // STRICT AUTHENTICATION GUARD
   if (!context.locals.user && !isPublicRoute) {
