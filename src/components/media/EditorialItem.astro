@@ -1,29 +1,47 @@
 ---
 import type { MediaItem } from '../../types';
+import { MANGA_PLACEHOLDER } from '../../utils/placeholders';
 
 interface Props {
   item: MediaItem;
 }
 
 const { item } = Astro.props;
+const coverSrc = item.coverImage || MANGA_PLACEHOLDER;
+const categoryTag = item.genres && item.genres[0] ? item.genres[0].toUpperCase() : (item.type === 'anime' ? 'ANIME' : 'MANGA');
 ---
 
-<a href={`/${item.sourceId || 'mangadex'}/${item.id}`} class="editorial-item">
-  <div class="editorial-header">
-    <h3 class="editorial-title">{item.title}</h3>
+<a href={`/${item.sourceId || 'mangadex'}/${item.id}`} class="editorial-card">
+  <div class="editorial-thumb-wrapper">
+    <img
+      src={coverSrc}
+      alt={item.title}
+      class="editorial-thumb-img"
+      loading="lazy"
+      onerror={`this.onerror=null; this.src='${MANGA_PLACEHOLDER}';`}
+    />
+    <span class="editorial-tag-badge">{categoryTag}</span>
   </div>
-  <p class="editorial-excerpt">
-    {item.editorialExcerpt || item.description}
-  </p>
-  <span class="editorial-link">READ SELECTION →</span>
+  
+  <div class="editorial-body">
+    <div class="editorial-meta-row">
+      <span class="editorial-picker-label">EDITOR'S PICK</span>
+      <span class="editorial-rating">★ {item.rating || 4.9}</span>
+    </div>
+    <h3 class="editorial-title">{item.title}</h3>
+    <p class="editorial-excerpt">
+      {item.editorialExcerpt || item.description || 'Curated editorial selection from Sirochan staff.'}
+    </p>
+    <span class="editorial-link">READ SELECTION →</span>
+  </div>
 </a>
 
 <style>
-  .editorial-item {
+  .editorial-card {
     display: flex;
-    flex-direction: column;
-    gap: 6px;
-    padding: 16px;
+    align-items: center;
+    gap: 14px;
+    padding: 12px;
     background-color: var(--bg-surface);
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-md);
@@ -31,35 +49,103 @@ const { item } = Astro.props;
     transition: all 0.2s ease;
   }
 
-  .editorial-item:hover {
-    border-color: var(--text-muted);
+  .editorial-card:hover {
+    border-color: var(--accent-red);
     transform: translateY(-2px);
     background-color: var(--bg-elevated);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  }
+
+  .editorial-thumb-wrapper {
+    position: relative;
+    width: 80px;
+    height: 104px;
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    flex-shrink: 0;
+    background-color: var(--bg-elevated);
+    border: 1px solid var(--border-subtle);
+  }
+
+  .editorial-thumb-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .editorial-tag-badge {
+    position: absolute;
+    bottom: 4px;
+    left: 4px;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    font-weight: 700;
+    padding: 1px 5px;
+    border-radius: 2px;
+    background-color: rgba(0, 0, 0, 0.85);
+    color: #ffffff;
+    letter-spacing: 0.02em;
+  }
+
+  .editorial-body {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .editorial-meta-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .editorial-picker-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--accent-orange);
+    letter-spacing: 0.05em;
+  }
+
+  .editorial-rating {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--text-muted);
   }
 
   .editorial-title {
     font-family: var(--font-hero);
-    font-size: 18px;
+    font-size: 0.98rem;
     font-weight: 700;
-    line-height: 24px;
+    line-height: 1.3;
     color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .editorial-excerpt {
     font-family: var(--font-body);
-    font-size: 14px;
+    font-size: 0.82rem;
     font-weight: 400;
-    line-height: 22px;
+    line-height: 1.4;
     color: var(--text-muted);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
   }
 
   .editorial-link {
     font-family: var(--font-mono);
-    font-size: 12px;
-    font-weight: 500;
-    line-height: 16px;
+    font-size: 11px;
+    font-weight: 700;
     letter-spacing: 0.02em;
     color: var(--accent-red);
-    margin-top: 4px;
+    margin-top: 2px;
   }
 </style>

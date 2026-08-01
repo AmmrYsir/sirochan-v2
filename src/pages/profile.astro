@@ -6,70 +6,88 @@ import { currentUser } from '../db/mockData';
 
 <MainLayout title="Profile - Sirochan" activeTab="profile">
   <div class="profile-page container-constrained">
-    <!-- User Card -->
+    <!-- User Header Banner Card -->
     <div class="user-header-card">
       <img src={currentUser.avatar} alt={currentUser.username} class="avatar" />
       <div class="user-info">
-        <h1 class="user-name">{currentUser.username}</h1>
+        <div class="name-row">
+          <h1 class="user-name">{currentUser.username}</h1>
+          <span class="member-badge">PRO MEMBER</span>
+        </div>
         <p class="user-handle">{currentUser.handle}</p>
-        <span class="member-badge">PRO MEMBER</span>
+        <p class="user-bio">Manga enthusiast & Anime streaming connoisseur on Sirochan v2.</p>
       </div>
     </div>
 
-    <!-- Stats Dashboard Grid -->
-    <div class="stats-grid">
-      <div class="stat-box">
-        <span class="stat-value">{currentUser.chaptersRead}</span>
-        <span class="stat-label">Chapters Read</span>
-      </div>
-      <div class="stat-box">
-        <span class="stat-value">{currentUser.hoursWatched}h</span>
-        <span class="stat-label">Hours Watched</span>
-      </div>
-      <div class="stat-box">
-        <span class="stat-value">{currentUser.readingStreakDays} 🔥</span>
-        <span class="stat-label">Day Streak</span>
-      </div>
-    </div>
-
-    <!-- Settings Group -->
-    <div class="settings-group">
-      <h2 class="settings-title">APP PREFERENCES</h2>
-
-      <div class="setting-row">
-        <div class="setting-info">
-          <span class="setting-name">Default Reader Mode</span>
-          <span class="setting-desc">Single Page vs Continuous Scroll</span>
+    <!-- Multi-Column Grid for Desktop -->
+    <div class="profile-grid">
+      <!-- Left Column: Stats & Reading Streak -->
+      <div class="profile-column">
+        <h2 class="section-heading">ACTIVITY & STATS</h2>
+        <div class="stats-grid">
+          <div class="stat-box">
+            <span class="stat-value">{currentUser.chaptersRead}</span>
+            <span class="stat-label">Chapters Read</span>
+          </div>
+          <div class="stat-box">
+            <span class="stat-value">{currentUser.hoursWatched}h</span>
+            <span class="stat-label">Hours Watched</span>
+          </div>
+          <div class="stat-box highlight">
+            <span class="stat-value">{currentUser.readingStreakDays} 🔥</span>
+            <span class="stat-label">Day Streak</span>
+          </div>
         </div>
-        <select class="setting-select">
-          <option value="continuous" selected={currentUser.preferredReaderMode === 'continuous'}>Continuous Scroll</option>
-          <option value="single" selected={currentUser.preferredReaderMode === 'single'}>Single Page</option>
-        </select>
-      </div>
 
-      <div class="setting-row">
-        <div class="setting-info">
-          <span class="setting-name">Anime Stream Quality</span>
-          <span class="setting-desc">Preferred streaming resolution</span>
+        <div class="streak-banner">
+          <div class="streak-icon">⚡</div>
+          <div class="streak-text">
+            <span class="streak-title">Daily Streak Active!</span>
+            <span class="streak-sub">Read 1 chapter or watch 1 episode today to keep your streak alive.</span>
+          </div>
         </div>
-        <select class="setting-select">
-          <option value="1080p" selected={currentUser.preferredStreamQuality === '1080p'}>1080p Full HD</option>
-          <option value="720p" selected={currentUser.preferredStreamQuality === '720p'}>720p HD</option>
-          <option value="auto">Auto Adaptive</option>
-        </select>
       </div>
 
-      <div class="setting-row">
-        <div class="setting-info">
-          <span class="setting-name">Dark Mode Theme</span>
-          <span class="setting-desc">Modern Japanese Editorial Theme</span>
+      <!-- Right Column: Settings & App Preferences -->
+      <div class="profile-column">
+        <h2 class="section-heading">APP PREFERENCES</h2>
+        <div class="settings-group">
+          <div class="setting-row">
+            <div class="setting-info">
+              <span class="setting-name">Default Reader Mode</span>
+              <span class="setting-desc">Single Page vs Continuous Scroll</span>
+            </div>
+            <select class="setting-select">
+              <option value="continuous" selected={currentUser.preferredReaderMode === 'continuous'}>Continuous Scroll</option>
+              <option value="single" selected={currentUser.preferredReaderMode === 'single'}>Single Page</option>
+            </select>
+          </div>
+
+          <div class="setting-row">
+            <div class="setting-info">
+              <span class="setting-name">Anime Stream Quality</span>
+              <span class="setting-desc">Preferred streaming resolution</span>
+            </div>
+            <select class="setting-select">
+              <option value="1080p" selected={currentUser.preferredStreamQuality === '1080p'}>1080p Full HD</option>
+              <option value="720p" selected={currentUser.preferredStreamQuality === '720p'}>720p HD</option>
+              <option value="auto">Auto Adaptive</option>
+            </select>
+          </div>
+
+          <div class="setting-row">
+            <div class="setting-info">
+              <span class="setting-name">Dark Mode Theme</span>
+              <span class="setting-desc">Modern Japanese Editorial Theme</span>
+            </div>
+            <span class="meta-tag">DARK FIRST (ACTIVE)</span>
+          </div>
         </div>
-        <span class="meta-tag">DARK FIRST (ACTIVE)</span>
-      </div>
-    </div>
 
-    <div class="action-footer">
-      <Button variant="secondary" size="lg" class="w-full">LOG OUT</Button>
+        <div class="action-footer">
+          <Button variant="secondary" size="lg" class="w-full">LOG OUT</Button>
+        </div>
+      </div>
     </div>
   </div>
 </MainLayout>
@@ -77,6 +95,7 @@ import { currentUser } from '../db/mockData';
 <style>
   .profile-page {
     padding-top: 24px;
+    padding-bottom: 40px;
     display: flex;
     flex-direction: column;
     gap: 32px;
@@ -85,50 +104,91 @@ import { currentUser } from '../db/mockData';
   .user-header-card {
     display: flex;
     align-items: center;
-    gap: 20px;
-    padding: 24px;
+    gap: 24px;
+    padding: 28px;
     background-color: var(--bg-surface);
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-lg);
   }
 
   .avatar {
-    width: 80px;
-    height: 80px;
+    width: 88px;
+    height: 88px;
     border-radius: var(--radius-full);
     object-fit: cover;
-    border: 2px solid var(--accent-red);
+    border: 3px solid var(--accent-red);
+    box-shadow: 0 4px 16px rgba(230, 57, 70, 0.25);
   }
 
   .user-info {
     display: flex;
     flex-direction: column;
-    align-items: flex-start;
-    gap: 4px;
+    gap: 6px;
+  }
+
+  .name-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
   }
 
   .user-name {
     font-family: var(--font-hero);
-    font-size: 1.5rem;
+    font-size: 1.8rem;
     font-weight: 800;
+    line-height: 1.1;
   }
 
   .user-handle {
     font-family: var(--font-mono);
-    font-size: 0.85rem;
+    font-size: 0.88rem;
     color: var(--text-muted);
   }
 
+  .user-bio {
+    font-size: 0.88rem;
+    color: var(--text-secondary);
+    margin-top: 2px;
+  }
+
   .member-badge {
-    margin-top: 4px;
-    padding: 2px 8px;
+    padding: 3px 10px;
     border-radius: var(--radius-full);
     background-color: rgba(244, 162, 97, 0.15);
     color: var(--accent-orange);
     border: 1px solid var(--accent-orange);
     font-family: var(--font-mono);
-    font-size: 0.7rem;
+    font-size: 0.72rem;
     font-weight: 700;
+  }
+
+  /* Multi-Column Layout Grid for Desktop */
+  .profile-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 32px;
+  }
+
+  @media (min-width: 1024px) {
+    .profile-grid {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+
+  .profile-column {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+
+  .section-heading {
+    font-family: var(--font-hero);
+    font-size: 1.15rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    color: #ffffff;
+    border-bottom: 1px solid var(--border-subtle);
+    padding-bottom: 8px;
   }
 
   /* Stats Grid */
@@ -143,16 +203,21 @@ import { currentUser } from '../db/mockData';
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    padding: 16px 8px;
+    padding: 20px 12px;
     background-color: var(--bg-surface);
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-md);
     text-align: center;
   }
 
+  .stat-box.highlight {
+    border-color: var(--accent-orange);
+    background-color: rgba(244, 162, 97, 0.06);
+  }
+
   .stat-value {
     font-family: var(--font-hero);
-    font-size: 1.5rem;
+    font-size: 1.6rem;
     font-weight: 800;
     color: #ffffff;
   }
@@ -163,27 +228,50 @@ import { currentUser } from '../db/mockData';
     margin-top: 4px;
   }
 
+  .streak-banner {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 16px 20px;
+    background-color: var(--bg-elevated);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+  }
+
+  .streak-icon {
+    font-size: 1.8rem;
+  }
+
+  .streak-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .streak-title {
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: #ffffff;
+  }
+
+  .streak-sub {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+  }
+
   /* Settings Group */
   .settings-group {
     display: flex;
     flex-direction: column;
-    gap: 16px;
-  }
-
-  .settings-title {
-    font-family: var(--font-hero);
-    font-size: 1.1rem;
-    font-weight: 700;
-    letter-spacing: 0.04em;
-    color: var(--text-secondary);
+    gap: 12px;
   }
 
   .setting-row {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 16px;
-    background-color: var(--bg-elevated);
+    padding: 16px 20px;
+    background-color: var(--bg-surface);
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-md);
   }
@@ -206,13 +294,14 @@ import { currentUser } from '../db/mockData';
   }
 
   .setting-select {
-    background-color: var(--bg-surface);
+    background-color: var(--bg-elevated);
     border: 1px solid var(--border-subtle);
     color: #ffffff;
-    padding: 6px 12px;
+    padding: 8px 14px;
     border-radius: var(--radius-sm);
     font-family: var(--font-body);
     font-size: 0.85rem;
+    outline: none;
   }
 
   .meta-tag {
@@ -224,5 +313,9 @@ import { currentUser } from '../db/mockData';
 
   .w-full {
     width: 100%;
+  }
+
+  .action-footer {
+    margin-top: 8px;
   }
 </style>

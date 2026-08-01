@@ -6,40 +6,90 @@ import AnimeCard from '../components/media/AnimeCard.astro';
 import EditorialItem from '../components/media/EditorialItem.astro';
 import Badge from '../components/common/Badge.astro';
 import { currentUser } from '../db/mockData';
+import { ApiService } from '../db/apiService';
 
-// Zero API requests on dashboard load
-const continueReading: any[] = [];
-const continueWatching: any[] = [];
-const trendingGrid: any[] = [];
-const editorialSelections: any[] = [];
+// Fetch live sources & browse catalog
+let heroItem: any;
+let continueReading: any[] = [];
+let continueWatching: any[] = [];
+let trendingSpotlight: any;
+let trendingGrid: any[] = [];
+let editorialSelections: any[] = [];
 
-const defaultItem = {
-  id: 'select-source',
-  title: 'SIROCHAN PLATFORM',
-  japaneseTitle: 'シロチャン',
-  type: 'manga' as const,
-  coverImage: 'https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=600&q=80',
-  bannerImage: 'https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=1600&q=80',
-  description: 'Welcome to Sirochan v2. Select a source provider from Discover to start reading manga or watching anime streams.',
-  rating: 5.0,
-  status: 'RELEASING' as const,
-  genres: ['Action', 'Fantasy'],
-  latestChapterOrEpisode: 'ONLINE',
-  updatedAgo: 'JUST NOW'
-};
+try {
+  const sources = await ApiService.getSources();
+  const browseResults = await Promise.all(
+    sources.map(src => ApiService.browseSource(src.id))
+  );
 
-const heroItem = defaultItem;
-const trendingItem = defaultItem;
+  const allLiveItems = browseResults.flatMap((res, i) => {
+    const srcId = sources[i]?.id || 'mangadex';
+    return res.items.map(item => ({
+      ...item,
+      sourceId: srcId
+    }));
+  });
+
+  const formattedLiveItems = allLiveItems.map(item => {
+    const isAnime = item.mediaType === 'anime';
+    return {
+      id: item.sourceTitleId,
+      sourceId: item.sourceId,
+      sourceTitleId: item.sourceTitleId,
+      title: item.title,
+      japaneseTitle: item.title,
+      type: item.mediaType,
+      coverImage: item.thumbnailUrl || (isAnime 
+        ? 'https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=600&q=80'
+        : 'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?auto=format&fit=crop&w=600&q=80'),
+      bannerImage: item.thumbnailUrl || 'https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=1600&q=80',
+      description: item.description || `Read or watch ${item.title} live on Sirochan v2.`,
+      rating: item.rating || 4.9,
+      status: 'RELEASING' as const,
+      genres: item.genres && item.genres.length > 0 ? item.genres : [isAnime ? 'Anime Stream' : 'Manga'],
+      latestChapterOrEpisode: isAnime ? `EP. ${item.totalEpisodes || 'HD'}` : `CH. ${item.totalChapters || 'NEW'}`,
+      updatedAgo: 'RECENT',
+      progressPercent: Math.floor(Math.random() * 50) + 35
+    };
+  });
+
+  const mangaItems = formattedLiveItems.filter(item => item.type === 'manga');
+  const animeItems = formattedLiveItems.filter(item => item.type === 'anime');
+
+  heroItem = formattedLiveItems[0] || {
+    id: 'select-source',
+    sourceId: 'mangadex',
+    title: 'SIROCHAN PLATFORM',
+    type: 'manga' as const,
+    coverImage: 'https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=600&q=80',
+    bannerImage: 'https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=1600&q=80',
+    description: 'Welcome to Sirochan v2. Select a provider source from Discover to start reading manga or watching anime streams.',
+    rating: 5.0,
+    status: 'RELEASING' as const,
+    genres: ['Action', 'Fantasy'],
+    latestChapterOrEpisode: 'ONLINE',
+    updatedAgo: 'JUST NOW'
+  };
+
+  continueReading = mangaItems.slice(0, 10);
+  continueWatching = animeItems.slice(0, 10);
+  trendingSpotlight = formattedLiveItems[1] || heroItem;
+  trendingGrid = formattedLiveItems.slice(2, 10);
+  editorialSelections = formattedLiveItems.slice(10, 16);
+} catch (err) {
+  console.error('[Dashboard] Error fetching live media items:', err);
+}
 ---
 
 <MainLayout title="Sirochan - Manga & Anime Platform" activeTab="home">
   <!-- Hero Featured Banner -->
-  <HeroBanner item={heroItem} />
+  {heroItem && <HeroBanner item={heroItem} />}
 
   <div class="main-content container-constrained">
     <!-- User Greeting Section -->
     <section class="user-greeting-section">
       <h2 class="user-greeting">Good evening, {currentUser.username}</h2>
+      <p class="user-subtext">Pick up right where you left off across your active reading and streaming channels.</p>
     </section>
 
     <!-- Continue Reading Row -->
@@ -84,19 +134,36 @@ const trendingItem = defaultItem;
       <section class="feed-section trending-section">
         <div class="section-header-row">
           <div class="header-title-group">
-            <h2 class="section-title">TRENDING NOW</h2>
-            <Badge variant="red">POPULAR</Badge>
+            <h2 class="section-title">TRENDING SPOTLIGHT</h2>
+            <Badge variant="red">HOT</Badge>
           </div>
         </div>
 
-        {trendingItem && (
+        {trendingSpotlight && (
           <div class="trending-spotlight">
-            <AnimeCard item={trendingItem} />
+            <a href={`/${trendingSpotlight.sourceId || 'mangadex'}/${trendingSpotlight.id}`} class="spotlight-banner-card">
+              <div class="spotlight-cover-col">
+                <img src={trendingSpotlight.coverImage} alt={trendingSpotlight.title} class="spotlight-cover-img" />
+                <span class="spotlight-type-badge">{trendingSpotlight.type.toUpperCase()}</span>
+              </div>
+              <div class="spotlight-info-col">
+                <div class="spotlight-top-tags">
+                  <span class="rank-tag">#1 TRENDING</span>
+                  <span class="rating-tag">★ {trendingSpotlight.rating}</span>
+                </div>
+                <h3 class="spotlight-title">{trendingSpotlight.title}</h3>
+                <p class="spotlight-desc">{trendingSpotlight.description}</p>
+                <div class="spotlight-footer">
+                  <span class="spotlight-ch-meta">{trendingSpotlight.latestChapterOrEpisode}</span>
+                  <span class="spotlight-cta">EXPLORE TITLE →</span>
+                </div>
+              </div>
+            </a>
           </div>
         )}
 
         {trendingGrid.length > 0 && (
-          <div class="trending-grid">
+          <div class="trending-grid responsive-media-grid">
             {trendingGrid.map((item) => (
               item.type === 'manga' ? <MangaCard item={item} /> : <AnimeCard item={item} />
             ))}
@@ -133,13 +200,16 @@ const trendingItem = defaultItem;
   .main-content {
     display: flex;
     flex-direction: column;
-    gap: 32px;
+    gap: 36px;
     padding-top: 24px;
     padding-bottom: 40px;
   }
 
   .user-greeting-section {
-    margin-bottom: -8px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: -4px;
   }
 
   .user-greeting {
@@ -148,6 +218,11 @@ const trendingItem = defaultItem;
     font-weight: 800;
     letter-spacing: -0.01em;
     color: #ffffff;
+  }
+
+  .user-subtext {
+    font-size: 0.92rem;
+    color: var(--text-muted);
   }
 
   .feed-section {
@@ -172,7 +247,7 @@ const trendingItem = defaultItem;
 
   .section-title {
     font-family: var(--font-hero);
-    font-size: 1.25rem;
+    font-size: 1.2rem;
     font-weight: 800;
     letter-spacing: 0.04em;
     color: #ffffff;
@@ -208,14 +283,14 @@ const trendingItem = defaultItem;
     display: flex;
     gap: 16px;
     overflow-x: auto;
-    padding-bottom: 8px;
+    padding-bottom: 12px;
   }
 
-  /* Split Layout Grid */
+  /* Split Layout Grid for Desktop & Ultra-Wide */
   .split-layout {
     display: grid;
     grid-template-columns: 1fr;
-    gap: 32px;
+    gap: 36px;
   }
 
   @media (min-width: 1024px) {
@@ -224,21 +299,180 @@ const trendingItem = defaultItem;
     }
   }
 
+  @media (min-width: 1440px) {
+    .split-layout {
+      grid-template-columns: 1fr 380px;
+    }
+  }
+
   .trending-spotlight {
     margin-bottom: 20px;
   }
 
-  .trending-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 16px;
+  /* Sleek Compact Horizontal Spotlight Card (Mobile-First) */
+  .spotlight-banner-card {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    height: 115px;
+    background-color: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    text-decoration: none;
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   }
 
   @media (min-width: 640px) {
-    .trending-grid {
-      grid-template-columns: repeat(4, 1fr);
+    .spotlight-banner-card {
+      height: 160px;
+      border-radius: var(--radius-lg);
     }
   }
+
+  .spotlight-banner-card:hover {
+    border-color: var(--accent-red);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  }
+
+  .spotlight-cover-col {
+    position: relative;
+    width: 88px;
+    height: 100%;
+    overflow: hidden;
+    background-color: var(--bg-elevated);
+    flex-shrink: 0;
+  }
+
+  @media (min-width: 640px) {
+    .spotlight-cover-col {
+      width: 170px;
+    }
+  }
+
+  .spotlight-cover-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .spotlight-type-badge {
+    position: absolute;
+    top: 6px;
+    left: 6px;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: var(--radius-sm);
+    background-color: rgba(0, 0, 0, 0.85);
+    color: #ffffff;
+    backdrop-filter: blur(4px);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+  }
+
+  .spotlight-info-col {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 10px 14px;
+    flex: 1;
+    min-width: 0;
+    height: 100%;
+    gap: 4px;
+  }
+
+  @media (min-width: 640px) {
+    .spotlight-info-col {
+      padding: 16px 20px;
+      gap: 8px;
+    }
+  }
+
+  .spotlight-top-tags {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .rank-tag {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    font-weight: 800;
+    color: var(--accent-red);
+    background-color: rgba(230, 57, 70, 0.15);
+    border: 1px solid var(--accent-red);
+    padding: 1px 6px;
+    border-radius: var(--radius-full);
+  }
+
+  .rating-tag {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--accent-orange);
+  }
+
+  .spotlight-title {
+    font-family: var(--font-hero);
+    font-size: 0.95rem;
+    font-weight: 800;
+    color: #ffffff;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  @media (min-width: 640px) {
+    .spotlight-title {
+      font-size: 1.2rem;
+    }
+  }
+
+  .spotlight-desc {
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+    line-height: 1.35;
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  @media (min-width: 640px) {
+    .spotlight-desc {
+      font-size: 0.85rem;
+      line-height: 1.45;
+      -webkit-line-clamp: 2;
+    }
+  }
+
+  .spotlight-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-top: 1px solid var(--border-subtle);
+    padding-top: 6px;
+    margin-top: auto;
+  }
+
+  .spotlight-ch-meta {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-muted);
+  }
+
+  .spotlight-cta {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--accent-red);
+    letter-spacing: 0.03em;
+  }
+
 
   .editorial-stack {
     display: flex;

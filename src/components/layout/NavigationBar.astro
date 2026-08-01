@@ -1,6 +1,6 @@
 ---
 interface Props {
-  activeTab?: 'home' | 'discover' | 'library' | 'profile';
+  activeTab?: string;
 }
 
 const { activeTab = 'home' } = Astro.props;
@@ -54,7 +54,7 @@ const navItems = [
     left: 0;
     right: 0;
     z-index: 90;
-    background-color: rgba(18, 18, 18, 0.95);
+    background-color: rgba(14, 14, 14, 0.95);
     backdrop-filter: blur(16px);
     border-top: 1px solid var(--border-subtle);
     padding-bottom: env(safe-area-inset-bottom, 0);
@@ -64,7 +64,7 @@ const navItems = [
     display: flex;
     align-items: center;
     justify-content: space-around;
-    height: 64px;
+    height: 60px;
   }
 
   .nav-item {
@@ -93,26 +93,10 @@ const navItems = [
     letter-spacing: 0.01em;
   }
 
+  /* Hidden on tablet and desktop screens as SidebarNav handles navigation */
   @media (min-width: 768px) {
     .bottom-nav {
-      position: sticky;
-      top: 60px;
-      bottom: auto;
-      border-top: none;
-      border-bottom: 1px solid var(--border-subtle);
-      background-color: var(--bg-surface);
-    }
-    .nav-container {
-      justify-content: flex-start;
-      gap: 32px;
-      height: 48px;
-    }
-    .nav-item {
-      flex-direction: row;
-      gap: 8px;
-    }
-    .nav-label {
-      font-size: 13px;
+      display: none;
     }
   }
 </style>

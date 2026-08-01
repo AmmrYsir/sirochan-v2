@@ -126,7 +126,7 @@ const genres = ['All', ...combinedGenres];
       </div>
 
       <!-- Media Grid from Selected Source -->
-      <div class="media-grid" id="source-media-grid">
+      <div class="responsive-media-grid" id="source-media-grid">
         {mediaList.map(item => (
           item.type === 'manga' ? (
             <MangaCard item={item} />

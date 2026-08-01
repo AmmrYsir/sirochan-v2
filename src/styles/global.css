@@ -29,10 +29,13 @@
   --radius-lg: 1.5rem;  /* 24px */
   --radius-full: 9999px;
 
-  /* Spacing */
+  /* Spacing & Layout Constraints */
   --unit-space: 8px;
   --gutter: 24px;
-  --max-width: 1440px;
+  --max-width: 1760px;
+  --sidebar-width: 240px;
+  --sidebar-collapsed-width: 72px;
+  --header-height: 64px;
 }
 
 *, *::before, *::after {
@@ -181,3 +184,33 @@ img, video {
     padding-right: 24px;
   }
 }
+
+/* Fluid Responsive Grids across viewports */
+.responsive-media-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 12px;
+}
+
+@media (min-width: 640px) {
+  .responsive-media-grid {
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 16px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .responsive-media-grid {
+    grid-template-columns: repeat(auto-fill, minmax(165px, 1fr));
+    gap: 20px;
+  }
+}
+
+@media (min-width: 1440px) {
+  .responsive-media-grid {
+    grid-template-columns: repeat(auto-fill, minmax(175px, 1fr));
+    gap: 24px;
+  }
+}
+
+

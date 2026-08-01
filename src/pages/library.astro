@@ -8,27 +8,39 @@ const sources = await ApiService.getSources();
 const browseResults = await Promise.all(
   sources.map(src => ApiService.browseSource(src.id))
 );
-const allItems = browseResults.flatMap(res => res.items);
+
+const allItems = browseResults.flatMap((res, idx) => {
+  const srcId = sources[idx]?.id || 'mangadex';
+  return res.items.map(item => ({
+    ...item,
+    sourceId: srcId
+  }));
+});
 
 const mediaList = allItems.map(item => {
-  const safeId = (item.sourceTitleId || 'title').replace(/[\/\s]/g, '-').toLowerCase();
+  const isAnime = item.mediaType === 'anime';
   return {
-    id: safeId,
+    id: item.sourceTitleId,
+    sourceId: item.sourceId,
+    sourceTitleId: item.sourceTitleId,
     title: item.title,
     type: item.mediaType,
-    coverImage: item.thumbnailUrl || 'https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=600&q=80',
+    coverImage: item.thumbnailUrl || (isAnime 
+      ? 'https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=600&q=80'
+      : 'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?auto=format&fit=crop&w=600&q=80'),
     bannerImage: item.thumbnailUrl || 'https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=1600&q=80',
     description: item.description || 'Saved library title.',
     rating: item.rating || 4.8,
     status: 'RELEASING' as const,
-    genres: ['Action', 'Fantasy'],
-    latestChapterOrEpisode: item.mediaType === 'manga' ? `CH. ${item.totalChapters || 100}` : `EP. ${item.totalEpisodes || 12}`,
-    updatedAgo: 'SAVED'
+    genres: item.genres && item.genres.length > 0 ? item.genres : [isAnime ? 'Anime' : 'Manga'],
+    latestChapterOrEpisode: isAnime ? `EP. ${item.totalEpisodes || 12}` : `CH. ${item.totalChapters || 100}`,
+    updatedAgo: 'SAVED',
+    progressPercent: Math.floor(Math.random() * 40) + 40
   };
 });
 
-const continueMedia = mediaList.slice(0, 4);
-const bookmarkedMedia = mediaList.slice(4);
+const continueMedia = mediaList.slice(0, 6);
+const bookmarkedMedia = mediaList.slice(6);
 ---
 
 <MainLayout title="My Library - Sirochan" activeTab="library">
@@ -37,17 +49,20 @@ const bookmarkedMedia = mediaList.slice(4);
       <h1 class="page-title">MY LIBRARY</h1>
       
       <div class="lib-tabs">
-        <button class="lib-tab active">In Progress ({continueMedia.length})</button>
-        <button class="lib-tab">Bookmarks ({bookmarkedMedia.length})</button>
-        <button class="lib-tab">Favorites</button>
-        <button class="lib-tab">History</button>
+        <button class="lib-tab active" data-tab="all">All Titles ({mediaList.length})</button>
+        <button class="lib-tab" data-tab="in-progress">In Progress ({continueMedia.length})</button>
+        <button class="lib-tab" data-tab="bookmarks">Bookmarked ({bookmarkedMedia.length})</button>
+        <button class="lib-tab" data-tab="favorites">Favorites</button>
       </div>
     </div>
 
     <!-- Continue / In Progress Section -->
-    <section class="lib-section">
-      <h2 class="section-subtitle">CONTINUE READING & WATCHING</h2>
-      <div class="media-grid">
+    <section class="lib-section" id="sec-in-progress">
+      <div class="section-title-wrapper">
+        <h2 class="section-subtitle">CONTINUE READING & WATCHING</h2>
+        <span class="count-tag">{continueMedia.length} Active</span>
+      </div>
+      <div class="responsive-media-grid">
         {continueMedia.map(item => (
           item.type === 'manga' ? (
             <MangaCard item={item} />
@@ -59,9 +74,12 @@ const bookmarkedMedia = mediaList.slice(4);
     </section>
 
     <!-- Bookmarks Section -->
-    <section class="lib-section">
-      <h2 class="section-subtitle">BOOKMARKED TITLES</h2>
-      <div class="media-grid">
+    <section class="lib-section" id="sec-bookmarks">
+      <div class="section-title-wrapper">
+        <h2 class="section-subtitle">BOOKMARKED TITLES</h2>
+        <span class="count-tag">{bookmarkedMedia.length} Saved</span>
+      </div>
+      <div class="responsive-media-grid">
         {bookmarkedMedia.map(item => (
           item.type === 'manga' ? (
             <MangaCard item={item} />
@@ -76,32 +94,37 @@ const bookmarkedMedia = mediaList.slice(4);
 
 <script>
   const libTabs = document.querySelectorAll('.lib-tab');
-  const sections = document.querySelectorAll('.lib-section');
+  const secInProgress = document.getElementById('sec-in-progress');
+  const secBookmarks = document.getElementById('sec-bookmarks');
 
-  libTabs.forEach((tab, index) => {
+  libTabs.forEach((tab) => {
     tab.addEventListener('click', () => {
       libTabs.forEach(t => t.classList.remove('active'));
       tab.classList.add('active');
 
-      sections.forEach((sec, sIdx) => {
-        if (index === 0) {
-          (sec as HTMLElement).style.display = 'flex';
-        } else if (index === 1) {
-          (sec as HTMLElement).style.display = sIdx === 1 ? 'flex' : 'none';
-        } else {
-          (sec as HTMLElement).style.display = sIdx === 0 ? 'flex' : 'none';
-        }
-      });
+      const targetTab = tab.getAttribute('data-tab');
+
+      if (targetTab === 'in-progress') {
+        if (secInProgress) secInProgress.style.display = 'flex';
+        if (secBookmarks) secBookmarks.style.display = 'none';
+      } else if (targetTab === 'bookmarks') {
+        if (secInProgress) secInProgress.style.display = 'none';
+        if (secBookmarks) secBookmarks.style.display = 'flex';
+      } else {
+        if (secInProgress) secInProgress.style.display = 'flex';
+        if (secBookmarks) secBookmarks.style.display = 'flex';
+      }
     });
   });
 </script>
 
 <style>
   .library-page {
-    padding-top: 20px;
+    padding-top: 24px;
+    padding-bottom: 40px;
     display: flex;
     flex-direction: column;
-    gap: 32px;
+    gap: 36px;
   }
 
   .page-title {
@@ -109,13 +132,14 @@ const bookmarkedMedia = mediaList.slice(4);
     font-size: 2rem;
     font-weight: 800;
     margin-bottom: 16px;
+    letter-spacing: -0.01em;
   }
 
   .lib-tabs {
     display: flex;
     gap: 8px;
     border-bottom: 1px solid var(--border-subtle);
-    padding-bottom: 8px;
+    padding-bottom: 12px;
     overflow-x: auto;
   }
 
@@ -127,6 +151,12 @@ const bookmarkedMedia = mediaList.slice(4);
     font-weight: 600;
     color: var(--text-muted);
     white-space: nowrap;
+    transition: all 0.2s ease;
+  }
+
+  .lib-tab:hover {
+    color: #ffffff;
+    background-color: var(--bg-surface);
   }
 
   .lib-tab.active {
@@ -138,27 +168,30 @@ const bookmarkedMedia = mediaList.slice(4);
   .lib-section {
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 18px;
+  }
+
+  .section-title-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 12px;
   }
 
   .section-subtitle {
     font-family: var(--font-hero);
-    font-size: 1.1rem;
+    font-size: 1.15rem;
     font-weight: 700;
     color: var(--text-secondary);
     letter-spacing: 0.03em;
   }
 
-  .media-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-    gap: 20px 16px;
-  }
-
-  @media (min-width: 640px) {
-    .media-grid {
-      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-      gap: 24px 20px;
-    }
+  .count-tag {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-muted);
+    background-color: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    padding: 2px 8px;
+    border-radius: var(--radius-sm);
   }
 </style>
