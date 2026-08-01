@@ -5,204 +5,469 @@ import MangaCard from '../components/media/MangaCard.astro';
 import AnimeCard from '../components/media/AnimeCard.astro';
 import EditorialItem from '../components/media/EditorialItem.astro';
 import Badge from '../components/common/Badge.astro';
-import { currentUser } from '../db/mockData';
 import { ApiService } from '../db/apiService';
+import { db } from '../db/client';
+import { userProgress } from '../db/schema';
+import { eq, desc } from 'drizzle-orm';
 import { getPrivacyTitleUrl } from '../utils/privacy';
 
-// Fetch live sources & browse catalog
-let heroItem: any;
+const user = Astro.locals.user;
+const userName = user?.username || 'Arata';
+
+let heroItem: any = null;
 let continueReading: any[] = [];
 let continueWatching: any[] = [];
-let trendingSpotlight: any;
+let trendingSpotlight: any = null;
 let trendingGrid: any[] = [];
 let editorialSelections: any[] = [];
+let fetchError: string | null = null;
 
+// 1. Fetch real DB user progress for Continue Reading & Continue Watching
+if (user) {
+  try {
+    const dbProgress = await db.query.userProgress.findMany({
+      where: eq(userProgress.userId, user.id),
+      orderBy: [desc(userProgress.lastReadOrWatchedAt)]
+    });
+
+    if (dbProgress.length > 0) {
+      const mediaIds = dbProgress.map(p => p.mediaId);
+      const mediaEntries = await db.query.media.findMany({
+        where: (table, { inArray }) => inArray(table.id, mediaIds)
+      });
+      const mediaMap = new Map(mediaEntries.map(m => [m.id, m]));
+
+      const mappedProgress = await Promise.all(dbProgress.map(async p => {
+        const cached = mediaMap.get(p.mediaId);
+        const [srcId, titleId] = p.mediaId.split(':');
+        let liveDetails: any = null;
+        if (srcId && titleId) {
+          liveDetails = await ApiService.getTitleDetails(srcId, titleId);
+        }
+        const isAnime = p.contentType === 'episode' || (liveDetails?.mediaType || cached?.type) === 'anime';
+
+        return {
+          id: titleId || p.mediaId,
+          sourceId: srcId || 'mangadex',
+          sourceTitleId: titleId || p.mediaId,
+          title: liveDetails?.title || cached?.title || titleId || 'In Progress',
+          type: isAnime ? 'anime' : 'manga',
+          coverImage: liveDetails?.thumbnailUrl || cached?.coverImage || (isAnime 
+            ? 'https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=600&q=80'
+            : 'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?auto=format&fit=crop&w=600&q=80'),
+          bannerImage: liveDetails?.thumbnailUrl || cached?.bannerImage,
+          description: liveDetails?.description || 'In progress media.',
+          rating: liveDetails?.rating || 4.9,
+          status: 'RELEASING' as const,
+          genres: liveDetails?.tags || cached?.genres || [isAnime ? 'Anime' : 'Manga'],
+          latestChapterOrEpisode: isAnime ? `EP. ${p.contentNumber}` : `CH. ${p.contentNumber}`,
+          updatedAgo: 'PROGRESS',
+          progressPercent: p.progressPercent || 50
+        };
+      }));
+
+      continueReading = mappedProgress.filter(i => i.type === 'manga');
+      continueWatching = mappedProgress.filter(i => i.type === 'anime');
+    }
+  } catch (err: any) {
+    console.error('[Dashboard] Error fetching DB user progress:', err);
+  }
+}
+
+// 2. Fetch live sources & catalog feed
 try {
   const sources = await ApiService.getSources();
-  const browseResults = await Promise.all(
-    sources.map(src => ApiService.browseSource(src.id))
-  );
+  if (!sources || sources.length === 0) {
+    fetchError = 'No media sources available. Please check server microservice status.';
+  } else {
+    const browseResults = await Promise.all(
+      sources.map(src => ApiService.browseSource(src.id))
+    );
 
-  const allLiveItems = browseResults.flatMap((res, i) => {
-    const srcId = sources[i]?.id || 'mangadex';
-    return res.items.map(item => ({
-      ...item,
-      sourceId: srcId
-    }));
-  });
+    const allLiveItems = browseResults.flatMap((res, i) => {
+      const srcId = sources[i]?.id || 'mangadex';
+      return res.items.map(item => ({
+        ...item,
+        sourceId: srcId
+      }));
+    });
 
-  const formattedLiveItems = allLiveItems.map(item => {
-    const isAnime = item.mediaType === 'anime';
-    return {
-      id: item.sourceTitleId,
-      sourceId: item.sourceId,
-      sourceTitleId: item.sourceTitleId,
-      title: item.title,
-      japaneseTitle: item.title,
-      type: item.mediaType,
-      coverImage: item.thumbnailUrl || (isAnime 
-        ? 'https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=600&q=80'
-        : 'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?auto=format&fit=crop&w=600&q=80'),
-      bannerImage: item.thumbnailUrl || 'https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=1600&q=80',
-      description: item.description || `Read or watch ${item.title} live on Sirochan v2.`,
-      rating: item.rating || 4.9,
-      status: 'RELEASING' as const,
-      genres: item.genres && item.genres.length > 0 ? item.genres : [isAnime ? 'Anime Stream' : 'Manga'],
-      latestChapterOrEpisode: isAnime ? `EP. ${item.totalEpisodes || 'HD'}` : `CH. ${item.totalChapters || 'NEW'}`,
-      updatedAgo: 'RECENT',
-      progressPercent: Math.floor(Math.random() * 50) + 35
-    };
-  });
+    if (allLiveItems.length === 0) {
+      fetchError = 'No catalog items found across sources.';
+    } else {
+      const formattedLiveItems = allLiveItems.map(item => {
+        const isAnime = item.mediaType === 'anime';
+        return {
+          id: item.sourceTitleId,
+          sourceId: item.sourceId,
+          sourceTitleId: item.sourceTitleId,
+          title: item.title,
+          japaneseTitle: item.title,
+          type: item.mediaType,
+          coverImage: item.thumbnailUrl || (isAnime 
+            ? 'https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=600&q=80'
+            : 'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?auto=format&fit=crop&w=600&q=80'),
+          bannerImage: item.thumbnailUrl || 'https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=1600&q=80',
+          description: item.description || `Read or watch ${item.title} live on Sirochan v2.`,
+          rating: item.rating || 4.9,
+          status: 'RELEASING' as const,
+          genres: item.genres && item.genres.length > 0 ? item.genres : [isAnime ? 'Anime Stream' : 'Manga'],
+          latestChapterOrEpisode: isAnime ? `EP. ${item.totalEpisodes || 'HD'}` : `CH. ${item.totalChapters || 'NEW'}`,
+          updatedAgo: 'RECENT',
+          progressPercent: Math.floor(Math.random() * 50) + 35
+        };
+      });
 
-  const mangaItems = formattedLiveItems.filter(item => item.type === 'manga');
-  const animeItems = formattedLiveItems.filter(item => item.type === 'anime');
-
-  heroItem = formattedLiveItems[0] || {
-    id: 'select-source',
-    sourceId: 'mangadex',
-    title: 'SIROCHAN PLATFORM',
-    type: 'manga' as const,
-    coverImage: 'https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=600&q=80',
-    bannerImage: 'https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=1600&q=80',
-    description: 'Welcome to Sirochan v2. Select a provider source from Discover to start reading manga or watching anime streams.',
-    rating: 5.0,
-    status: 'RELEASING' as const,
-    genres: ['Action', 'Fantasy'],
-    latestChapterOrEpisode: 'ONLINE',
-    updatedAgo: 'JUST NOW'
-  };
-
-  continueReading = mangaItems.slice(0, 10);
-  continueWatching = animeItems.slice(0, 10);
-  trendingSpotlight = formattedLiveItems[1] || heroItem;
-  trendingGrid = formattedLiveItems.slice(2, 10);
-  editorialSelections = formattedLiveItems.slice(10, 16);
-} catch (err) {
-  console.error('[Dashboard] Error fetching live media items:', err);
+      heroItem = formattedLiveItems[0];
+      trendingSpotlight = formattedLiveItems[1] || heroItem;
+      trendingGrid = formattedLiveItems.slice(2, 10);
+      editorialSelections = formattedLiveItems.slice(10, 16);
+    }
+  }
+} catch (err: any) {
+  console.error('[Dashboard] Error fetching live catalog:', err);
+  fetchError = err.message || 'Failed to load media catalog feeds from Loouwd microservice.';
 }
 ---
 
 <MainLayout title="Sirochan - Manga & Anime Platform" activeTab="home">
+  <!-- Error Notification Banner -->
+  {fetchError && (
+    <div class="container-constrained error-banner-wrapper">
+      <div class="error-banner">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="12" y1="8" x2="12" y2="12"></line>
+          <line x1="12" y1="16" x2="12.01" y2="16"></line>
+        </svg>
+        <div class="error-info">
+          <span class="error-title">SYSTEM NOTICE</span>
+          <p class="error-msg">{fetchError}</p>
+        </div>
+      </div>
+    </div>
+  )}
+
   <!-- Hero Featured Banner -->
-  {heroItem && <HeroBanner item={heroItem} />}
+  {heroItem ? (
+    <HeroBanner item={heroItem} />
+  ) : !fetchError ? (
+    <div class="skeleton-hero container-constrained">
+      <div class="skeleton-pulse skeleton-bg"></div>
+    </div>
+  ) : null}
 
   <div class="main-content container-constrained">
     <!-- User Greeting Section -->
     <section class="user-greeting-section">
-      <h2 class="user-greeting">Good evening, {currentUser.username}</h2>
+      <h2 class="user-greeting">Welcome back, {userName}</h2>
       <p class="user-subtext">Pick up right where you left off across your active reading and streaming channels.</p>
     </section>
 
-    <!-- Continue Reading Row -->
-    {continueReading.length > 0 && (
-      <section class="feed-section">
-        <div class="section-header-row">
-          <div class="header-title-group">
-            <h2 class="section-title">CONTINUE READING</h2>
-            <span class="section-badge-dot"></span>
-          </div>
-          <a href="/library" class="view-all-link">VIEW LIBRARY →</a>
+    <!-- Continue Reading Row (Real Bookmarked/Progress Items) -->
+    <section class="feed-section">
+      <div class="section-header-row">
+        <div class="header-title-group">
+          <h2 class="section-title">CONTINUE READING</h2>
+          <span class="section-badge-dot"></span>
         </div>
+        <a href="/library" class="view-all-link">VIEW LIBRARY →</a>
+      </div>
+
+      {continueReading.length > 0 ? (
         <div class="scroll-row hide-scrollbar">
           {continueReading.map((item) => (
             <MangaCard item={item} />
           ))}
         </div>
-      </section>
-    )}
-
-    <!-- Continue Watching Row -->
-    {continueWatching.length > 0 && (
-      <section class="feed-section">
-        <div class="section-header-row">
-          <div class="header-title-group">
-            <h2 class="section-title">CONTINUE WATCHING</h2>
-            <span class="section-badge-dot orange"></span>
+      ) : (
+        <div class="dashboard-empty-card">
+          <div class="empty-icon-circle">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+              <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+            </svg>
           </div>
-          <a href="/library" class="view-all-link">VIEW LIBRARY →</a>
+          <div class="empty-text-group">
+            <h4 class="empty-heading">No active reading progress</h4>
+            <p class="empty-subtext">Start reading manga from Discover to automatically track your chapter progress here.</p>
+          </div>
+          <a href="/discover" class="empty-action-btn">EXPLORE MANGA →</a>
         </div>
+      )}
+    </section>
+
+    <!-- Continue Watching Row (Real Bookmarked/Progress Items) -->
+    <section class="feed-section">
+      <div class="section-header-row">
+        <div class="header-title-group">
+          <h2 class="section-title">CONTINUE WATCHING</h2>
+          <span class="section-badge-dot orange"></span>
+        </div>
+        <a href="/library" class="view-all-link">VIEW LIBRARY →</a>
+      </div>
+
+      {continueWatching.length > 0 ? (
         <div class="scroll-row hide-scrollbar">
           {continueWatching.map((item) => (
             <AnimeCard item={item} />
           ))}
         </div>
-      </section>
-    )}
-
-    <!-- Trending & Editorial Split Layout -->
-    <div class="split-layout">
-      <!-- Left Column: Trending Section -->
-      <section class="feed-section trending-section">
-        <div class="section-header-row">
-          <div class="header-title-group">
-            <h2 class="section-title">TRENDING SPOTLIGHT</h2>
-            <Badge variant="red">HOT</Badge>
+      ) : (
+        <div class="dashboard-empty-card">
+          <div class="empty-icon-circle orange">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="5 3 19 12 5 21 5 3"></polygon>
+            </svg>
           </div>
+          <div class="empty-text-group">
+            <h4 class="empty-heading">No active watching progress</h4>
+            <p class="empty-subtext">Stream anime episodes from Discover to automatically pick up playback markers here.</p>
+          </div>
+          <a href="/discover" class="empty-action-btn orange">BROWSE ANIME →</a>
         </div>
+      )}
+    </section>
 
-        {trendingSpotlight && (
-          <div class="trending-spotlight">
-            <a href={getPrivacyTitleUrl({ sourceId: trendingSpotlight.sourceId, sourceTitleId: trendingSpotlight.sourceTitleId || trendingSpotlight.id, id: trendingSpotlight.id })} class="spotlight-banner-card">
-              <div class="spotlight-cover-col">
-                <img src={trendingSpotlight.coverImage} alt={trendingSpotlight.title} class="spotlight-cover-img" />
-                <span class="spotlight-type-badge">{trendingSpotlight.type.toUpperCase()}</span>
+    <!-- Trending & Popular Section -->
+    <section class="feed-section">
+      <div class="section-header-row">
+        <div class="header-title-group">
+          <h2 class="section-title">TRENDING NOW</h2>
+          <Badge variant="red">POPULAR</Badge>
+        </div>
+      </div>
+
+      {trendingSpotlight ? (
+        <div class="trending-spotlight">
+          <a href={getPrivacyTitleUrl({ sourceId: trendingSpotlight.sourceId, sourceTitleId: trendingSpotlight.sourceTitleId || trendingSpotlight.id, id: trendingSpotlight.id })} class="spotlight-banner-card">
+            <div class="spotlight-cover-col">
+              <img src={trendingSpotlight.coverImage} alt={trendingSpotlight.title} class="spotlight-cover-img" />
+              <span class="spotlight-type-badge">{trendingSpotlight.type.toUpperCase()}</span>
+            </div>
+            <div class="spotlight-info-col">
+              <div class="spotlight-top-tags">
+                <span class="rank-tag">#1 TRENDING</span>
+                <span class="rating-tag">★ {trendingSpotlight.rating}</span>
               </div>
-              <div class="spotlight-info-col">
-                <div class="spotlight-top-tags">
-                  <span class="rank-tag">#1 TRENDING</span>
-                  <span class="rating-tag">★ {trendingSpotlight.rating}</span>
-                </div>
-                <h3 class="spotlight-title">{trendingSpotlight.title}</h3>
-                <p class="spotlight-desc">{trendingSpotlight.description}</p>
-                <div class="spotlight-footer">
-                  <span class="spotlight-ch-meta">{trendingSpotlight.latestChapterOrEpisode}</span>
-                  <span class="spotlight-cta">EXPLORE TITLE →</span>
-                </div>
+              <h3 class="spotlight-title">{trendingSpotlight.title}</h3>
+              <p class="spotlight-desc">{trendingSpotlight.description}</p>
+              <div class="spotlight-footer">
+                <span class="spotlight-ch-meta">{trendingSpotlight.latestChapterOrEpisode}</span>
+                <span class="spotlight-cta">EXPLORE TITLE →</span>
               </div>
-            </a>
-          </div>
-        )}
+            </div>
+          </a>
+        </div>
+      ) : !fetchError ? (
+        <div class="skeleton-spotlight skeleton-pulse"></div>
+      ) : null}
 
-        {trendingGrid.length > 0 && (
-          <div class="trending-grid responsive-media-grid">
-            {trendingGrid.map((item) => (
-              item.type === 'manga' ? <MangaCard item={item} /> : <AnimeCard item={item} />
-            ))}
-          </div>
-        )}
-      </section>
+      {trendingGrid.length > 0 ? (
+        <div class="responsive-media-grid trending-grid">
+          {trendingGrid.map((item) => (
+            item.type === 'manga' ? (
+              <MangaCard item={item} />
+            ) : (
+              <AnimeCard item={item} />
+            )
+          ))}
+        </div>
+      ) : !fetchError ? (
+        <div class="responsive-media-grid">
+          {Array.from({ length: 6 }).map(() => (
+            <div class="skeleton-card skeleton-pulse"></div>
+          ))}
+        </div>
+      ) : null}
+    </section>
 
-      <!-- Right Column: Curated Editorials -->
-      <section class="feed-section editorial-section">
+    <!-- Curated Editorial Selections -->
+    {editorialSelections.length > 0 ? (
+      <section class="feed-section">
         <div class="section-header-row">
           <div class="header-title-group">
             <h2 class="section-title">CURATED EDITORIALS</h2>
+            <Badge variant="orange">STAFF PICKS</Badge>
           </div>
         </div>
-
-        {editorialSelections.length > 0 ? (
-          <div class="editorial-stack">
-            {editorialSelections.map((item) => (
-              <EditorialItem item={item} />
-            ))}
-          </div>
-        ) : (
-          <div class="empty-editorial-box">
-            <p>Select a provider source to start populating your feed.</p>
-            <a href="/discover" class="btn-discover">BROWSE SOURCES →</a>
-          </div>
-        )}
+        <div class="editorial-grid">
+          {editorialSelections.map((item) => (
+            <EditorialItem item={item} />
+          ))}
+        </div>
       </section>
-    </div>
+    ) : !fetchError ? (
+      <div class="editorial-grid">
+        {Array.from({ length: 4 }).map(() => (
+          <div class="skeleton-editorial skeleton-pulse"></div>
+        ))}
+      </div>
+    ) : null}
   </div>
 </MainLayout>
 
 <style>
+  .error-banner-wrapper {
+    margin-top: 16px;
+    margin-bottom: 16px;
+  }
+
+  .error-banner {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 18px;
+    background-color: rgba(230, 57, 70, 0.12);
+    border: 1px solid rgba(230, 57, 70, 0.4);
+    border-radius: var(--radius-md);
+    color: #E63946;
+  }
+
+  .error-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .error-title {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+  }
+
+  .error-msg {
+    font-size: 0.88rem;
+    color: var(--text-primary);
+  }
+
+  /* Skeleton Loaders */
+  .skeleton-pulse {
+    background: linear-gradient(90deg, #121212 25%, #1E1E1E 50%, #121212 75%);
+    background-size: 200% 100%;
+    animation: skeleton-shimmer 1.6s infinite ease-in-out;
+  }
+
+  @keyframes skeleton-shimmer {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+  }
+
+  .skeleton-hero {
+    width: 100%;
+    height: 320px;
+    border-radius: var(--radius-lg);
+    margin-bottom: 24px;
+    overflow: hidden;
+  }
+
+  .skeleton-bg {
+    width: 100%;
+    height: 100%;
+  }
+
+  .skeleton-card {
+    width: 100%;
+    aspect-ratio: 3 / 4;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-subtle);
+  }
+
+  .skeleton-spotlight {
+    width: 100%;
+    height: 160px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-subtle);
+    margin-bottom: 20px;
+  }
+
+  .skeleton-editorial {
+    width: 100%;
+    height: 104px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-subtle);
+  }
+
+  /* Empty State Card */
+  .dashboard-empty-card {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 20px;
+    background-color: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    width: 100%;
+  }
+
+  .empty-icon-circle {
+    width: 44px;
+    height: 44px;
+    border-radius: var(--radius-full);
+    background-color: rgba(230, 57, 70, 0.12);
+    color: #E63946;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .empty-icon-circle.orange {
+    background-color: rgba(244, 162, 97, 0.12);
+    color: #F4A261;
+  }
+
+  .empty-text-group {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1;
+  }
+
+  .empty-heading {
+    font-family: var(--font-hero);
+    font-size: 0.98rem;
+    font-weight: 700;
+    color: var(--text-primary);
+  }
+
+  .empty-subtext {
+    font-size: 0.82rem;
+    color: var(--text-muted);
+  }
+
+  .empty-action-btn {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 700;
+    color: #E63946;
+    text-decoration: none;
+    letter-spacing: 0.03em;
+    padding: 8px 14px;
+    border: 1px solid rgba(230, 57, 70, 0.3);
+    border-radius: var(--radius-sm);
+    white-space: nowrap;
+    transition: all 0.2s ease;
+  }
+
+  .empty-action-btn.orange {
+    color: #F4A261;
+    border-color: rgba(244, 162, 97, 0.3);
+  }
+
+  .empty-action-btn:hover {
+    background-color: rgba(230, 57, 70, 0.15);
+  }
+
+  .empty-action-btn.orange:hover {
+    background-color: rgba(244, 162, 97, 0.15);
+  }
+
   .main-content {
     display: flex;
     flex-direction: column;
     gap: 36px;
-    padding-top: 24px;
     padding-bottom: 40px;
   }
 
@@ -210,19 +475,17 @@ try {
     display: flex;
     flex-direction: column;
     gap: 4px;
-    margin-bottom: -4px;
   }
 
   .user-greeting {
     font-family: var(--font-hero);
-    font-size: 1.8rem;
+    font-size: 1.6rem;
     font-weight: 800;
-    letter-spacing: -0.01em;
-    color: #ffffff;
+    color: var(--text-primary);
   }
 
   .user-subtext {
-    font-size: 0.92rem;
+    font-size: 0.9rem;
     color: var(--text-muted);
   }
 
@@ -236,30 +499,27 @@ try {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    border-bottom: 1px solid var(--border-subtle);
-    padding-bottom: 10px;
   }
 
   .header-title-group {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 8px;
   }
 
   .section-title {
     font-family: var(--font-hero);
-    font-size: 1.2rem;
+    font-size: 1.1rem;
     font-weight: 800;
-    letter-spacing: 0.04em;
-    color: #ffffff;
+    color: var(--text-primary);
+    letter-spacing: 0.02em;
   }
 
   .section-badge-dot {
-    width: 8px;
-    height: 8px;
+    width: 6px;
+    height: 6px;
     border-radius: var(--radius-full);
     background-color: var(--accent-red);
-    display: inline-block;
   }
 
   .section-badge-dot.orange {
@@ -268,88 +528,52 @@ try {
 
   .view-all-link {
     font-family: var(--font-mono);
-    font-size: 0.78rem;
+    font-size: 11px;
     font-weight: 700;
-    color: var(--text-muted);
+    color: var(--accent-red);
     text-decoration: none;
     letter-spacing: 0.03em;
-    transition: color 0.2s ease;
-  }
-
-  .view-all-link:hover {
-    color: #ffffff;
   }
 
   .scroll-row {
     display: flex;
     gap: 16px;
     overflow-x: auto;
-    padding-bottom: 12px;
-  }
-
-  /* Split Layout Grid for Desktop & Ultra-Wide */
-  .split-layout {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 36px;
-  }
-
-  @media (min-width: 1024px) {
-    .split-layout {
-      grid-template-columns: 1fr 340px;
-    }
-  }
-
-  @media (min-width: 1440px) {
-    .split-layout {
-      grid-template-columns: 1fr 380px;
-    }
+    padding-bottom: 8px;
   }
 
   .trending-spotlight {
-    margin-bottom: 20px;
+    width: 100%;
+    margin-bottom: 16px;
   }
 
-  /* Sleek Compact Horizontal Spotlight Card (Mobile-First) */
   .spotlight-banner-card {
     display: flex;
-    flex-direction: row;
-    align-items: center;
-    height: 115px;
+    gap: 16px;
+    padding: 12px;
     background-color: var(--bg-surface);
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-md);
-    overflow: hidden;
     text-decoration: none;
-    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    height: 115px;
+    overflow: hidden;
+    transition: all 0.2s ease;
   }
 
   @media (min-width: 640px) {
     .spotlight-banner-card {
       height: 160px;
-      border-radius: var(--radius-lg);
+      padding: 16px;
     }
-  }
-
-  .spotlight-banner-card:hover {
-    border-color: var(--accent-red);
-    transform: translateY(-2px);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
   }
 
   .spotlight-cover-col {
     position: relative;
-    width: 88px;
     height: 100%;
-    overflow: hidden;
-    background-color: var(--bg-elevated);
+    aspect-ratio: 3 / 4;
     flex-shrink: 0;
-  }
-
-  @media (min-width: 640px) {
-    .spotlight-cover-col {
-      width: 170px;
-    }
+    border-radius: var(--radius-sm);
+    overflow: hidden;
   }
 
   .spotlight-cover-img {
@@ -360,35 +584,23 @@ try {
 
   .spotlight-type-badge {
     position: absolute;
-    top: 6px;
-    left: 6px;
+    top: 4px;
+    left: 4px;
     font-family: var(--font-mono);
     font-size: 9px;
-    font-weight: 700;
-    padding: 2px 6px;
-    border-radius: var(--radius-sm);
+    font-weight: 800;
+    padding: 1px 4px;
     background-color: rgba(0, 0, 0, 0.85);
     color: #ffffff;
-    backdrop-filter: blur(4px);
-    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 2px;
   }
 
   .spotlight-info-col {
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    padding: 10px 14px;
     flex: 1;
     min-width: 0;
-    height: 100%;
-    gap: 4px;
-  }
-
-  @media (min-width: 640px) {
-    .spotlight-info-col {
-      padding: 16px 20px;
-      gap: 8px;
-    }
   }
 
   .spotlight-top-tags {
@@ -399,13 +611,9 @@ try {
 
   .rank-tag {
     font-family: var(--font-mono);
-    font-size: 9px;
+    font-size: 10px;
     font-weight: 800;
     color: var(--accent-red);
-    background-color: rgba(230, 57, 70, 0.15);
-    border: 1px solid var(--accent-red);
-    padding: 1px 6px;
-    border-radius: var(--radius-full);
   }
 
   .rating-tag {
@@ -417,10 +625,9 @@ try {
 
   .spotlight-title {
     font-family: var(--font-hero);
-    font-size: 0.95rem;
+    font-size: 1rem;
     font-weight: 800;
-    color: #ffffff;
-    line-height: 1.2;
+    color: var(--text-primary);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -428,42 +635,29 @@ try {
 
   @media (min-width: 640px) {
     .spotlight-title {
-      font-size: 1.2rem;
+      font-size: 1.25rem;
     }
   }
 
   .spotlight-desc {
-    font-size: 0.78rem;
-    color: var(--text-secondary);
-    line-height: 1.35;
+    font-size: 0.82rem;
+    color: var(--text-muted);
     display: -webkit-box;
-    -webkit-line-clamp: 1;
+    -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
-  }
-
-  @media (min-width: 640px) {
-    .spotlight-desc {
-      font-size: 0.85rem;
-      line-height: 1.45;
-      -webkit-line-clamp: 2;
-    }
   }
 
   .spotlight-footer {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    border-top: 1px solid var(--border-subtle);
-    padding-top: 6px;
-    margin-top: auto;
   }
 
   .spotlight-ch-meta {
     font-family: var(--font-mono);
     font-size: 10px;
-    font-weight: 600;
-    color: var(--text-muted);
+    color: var(--text-secondary);
   }
 
   .spotlight-cta {
@@ -471,39 +665,17 @@ try {
     font-size: 10px;
     font-weight: 700;
     color: var(--accent-red);
-    letter-spacing: 0.03em;
   }
 
-
-  .editorial-stack {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
+  .editorial-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
   }
 
-  .empty-editorial-box {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 16px;
-    padding: 32px 20px;
-    background-color: var(--bg-surface);
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-md);
-    text-align: center;
-  }
-
-  .empty-editorial-box p {
-    font-size: 0.9rem;
-    color: var(--text-secondary);
-  }
-
-  .btn-discover {
-    font-family: var(--font-mono);
-    font-size: 0.8rem;
-    font-weight: 700;
-    color: var(--accent-red);
-    text-decoration: none;
+  @media (min-width: 768px) {
+    .editorial-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
   }
 </style>

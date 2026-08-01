@@ -145,12 +145,15 @@ export class ApiService {
 					?.map(opt => opt.label)
 					.filter(label => label && !label.toLowerCase().includes('all')) || [];
 
+				const rawIcon = m.iconUrl ? m.iconUrl.replace(/host\.docker\.internal/gi, 'localhost') : '';
+				const icon = rawIcon || (m.supportedMediaTypes.includes('manga') ? '📚' : '⚡');
+
 				return {
 					id: m.id,
 					name: m.name,
 					type: m.supportedMediaTypes.includes('anime') && m.supportedMediaTypes.includes('manga') ? 'dual' : m.supportedMediaTypes[0] || 'manga',
 					language: 'EN',
-					icon: m.iconUrl || (m.supportedMediaTypes.includes('manga') ? '📚' : '⚡'),
+					icon: icon,
 					isPinned: true,
 					status: 'ONLINE',
 					pingMs: 18,
