@@ -30,12 +30,13 @@ Agents must respect the multi-service architecture of Sirochan v2:
 | **SushiGuard Auth** | `http://localhost:3000` | Bun + Fastify authentication service (`/api/v1/auth/*`) |
 | **PostgreSQL 16** | `localhost:5433` (`sirochan_db`) | Relational persistence for profiles, library bookmarks, reading progress |
 
-### Environment Variables (`.env`)
+### Environment Variables (`.env`) & Strict Error Rules
 - `DATABASE_URL`: Connection string for PostgreSQL (`postgresql://sirochan:sirochan_secret@localhost:5433/sirochan_db`).
 - `LOOUWD_URL`: Microservice URL for media content (`http://localhost:8000` on host, or `http://host.docker.internal:8000` when running app in Docker).
 - `AUTH_URL`: Microservice URL for authentication (`http://localhost:3000` on host, or `http://host.docker.internal:3000` when running app in Docker).
 
-*Note: Port `5433` is mapped on the host machine to avoid collisions with other local Postgres services running on port `5432`.*
+> [!CAUTION]
+> **Strict Environment Fallback Rule**: NEVER hardcode fallback default strings for `DATABASE_URL` or `LOOUWD_URL` in codebase files (e.g. `client.ts` or `apiService.ts`). If an environment variable is omitted from `.env`, code MUST throw an explicit, readable `Error` exception so the user can supply the exact value.
 
 ---
 
@@ -49,14 +50,27 @@ All database operations must use Drizzle ORM defined in `src/db/schema.ts` and i
 3. `chapters`: Manga chapter catalog cache (`mediaId`, `chapterNumber`, `title`, `pageCount`).
 4. `episodes`: Anime episode catalog cache (`mediaId`, `episodeNumber`, `title`, `durationSeconds`).
 5. `user_progress`: Combined real-time read/watch progress (`userId`, `mediaId`, `contentType`, `contentId`, `contentNumber`, `timeMarkerSeconds`, `progressPercent`, `lastReadOrWatchedAt`).
-6. `bookmarks`: User library bookmarks across folders (`reading`, `watching`, `plan_to_read`, `plan_to_watch`, `completed`, `favorites`).
+6. `bookmarks`: User library bookmarks across folders (`reading`, `watching`, `in_progress`, `bookmarks`, `favorites`).
 7. `custom_lists` & `custom_list_items`: Manga stacks & anime playlists.
 8. `comments` & `comment_reactions`: Episode and chapter community discussion system.
 
 ### Database & Quality Commands
 - `bun run db:generate`: Create SQL migration file from updated `schema.ts`.
 - `bun run db:push`: Synchronize schema directly with PostgreSQL database.
-- `bun astro check`: Run TypeScript diagnostic check across all 39+ Astro components & TypeScript files.
+- `bun astro check`: Run TypeScript diagnostic check across all 44 Astro components & TypeScript files.
+
+---
+
+## 🔒 Privacy Protection & Route Architecture
+
+- **Opaque Token Encryption ([privacy.ts](file:///c:/Users/ammar/Desktop/sirochan-v2/src/utils/privacy.ts))**:
+  - `encodePrivacySlug(sourceId, titleId, contentId)` converts target metadata into opaque hash tokens.
+  - `decodePrivacySlug(token)` decodes tokens on SSR page load.
+- **Privacy Routes**:
+  - `/v/[token]` — Media detail view.
+  - `/read/[token]` — Manga reader view.
+  - `/watch/[token]` — Anime player view.
+- **Strict Privacy Rule**: Browser address bar, window title, tab label, browser history, and network logs MUST reveal zero plain text titles, genres, or chapter/episode numbers.
 
 ---
 
@@ -72,30 +86,32 @@ All database operations must use Drizzle ORM defined in `src/db/schema.ts` and i
 - **Session Validation & DB Sync**: Validates active access token with `AuthClient.getMe(token)` against `AUTH_URL`, auto-syncs user profile records in PostgreSQL `users` table, and attaches profile to `Astro.locals.user`.
 - **Strict Route Protection**:
   - **Whitelisted Public Routes**: `/login`, `/api/auth/*`, and static assets (`/_astro/*`, images, scripts).
-  - **Protected Page Routes** (`/`, `/discover`, `/library`, `/profile`, `/manga/*`, `/anime/*`, etc.): Unauthenticated visitors are automatically redirected to `/login` (302 Redirect).
+  - **Protected Page Routes** (`/`, `/discover`, `/library`, `/profile`, `/v/*`, `/read/*`, `/watch/*`, etc.): Unauthenticated visitors are automatically redirected to `/login` (302 Redirect).
   - **Protected API Routes** (`/api/progress/*`, `/api/library/*`): Unauthenticated requests return HTTP `401 Unauthorized`.
   - **Authenticated Visitor Redirect**: Authenticated users visiting `/login` are automatically redirected back to home (`/`).
 
 ---
 
-## 🎨 UI & Design System Rules
+## 🎨 UI, Viewport & Design System Rules
 
-All new UI components, pages, or modifications MUST adhere strictly to [`DESIGN.md`](./DESIGN.md):
+All UI components and page modifications MUST adhere strictly to [`DESIGN.md`](./DESIGN.md) and responsive multi-screen standards:
 
-1. **Dark Mode First**:
+1. **Responsive Viewports**:
+   - Mobile (`< 768px`): Bottom Navigation Bar (`NavigationBar.astro`), compact 115px spotlight banner, single-column responsive media grid.
+   - Tablet (`768px – 1024px`): Collapsed Left Rail Sidebar Navigation (`SidebarNav.astro`).
+   - Desktop (`≥ 1024px`): Full vertical Sidebar Navigation with user streak badge and profile widget.
+2. **Dark Mode First**:
    - Page canvas background: Pitch black (`#000000` / `var(--bg-deep)`).
    - Container surfaces: `#121212` (`var(--bg-surface)`).
    - Elevated cards/inputs: `#1E1E1E` (`var(--bg-elevated)`).
    - Solid 1px structural borders: `#2A2A2A` (`var(--border-subtle)`).
-2. **Color Palette**:
+3. **Color Palette**:
    - Primary Accent: Warm Red (`#E63946`) for active tabs, primary action buttons, and `#1 TRENDING` badges.
    - Secondary Accent: Soft Orange (`#F4A261`) for timeline fills and secondary badges.
-3. **Typography**:
+4. **Typography**:
    - Display headlines: **Hanken Grotesk** (`var(--font-hero)`).
    - Body & Form inputs: **Inter** (`var(--font-body)`).
    - Technical metadata & badges: **JetBrains Mono** (`var(--font-mono)`).
-4. **Interactive Controls**:
-   - Always include hover states and touch micro-interactions for buttons and cards.
 
 ---
 

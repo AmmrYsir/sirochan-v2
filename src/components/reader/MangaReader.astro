@@ -23,7 +23,7 @@ const {
 } = Astro.props;
 ---
 
-<div class="manga-reader-root" id="manga-reader-root">
+<div class="manga-reader-root" id="manga-reader-root" data-manga-id={mangaId} data-manga-title={mangaTitle} data-chapter-number={chapterNumber}>
 	<!-- Top Floating Header Bar -->
 	<header class="reader-top-bar">
 		<div class="bar-left">
@@ -133,6 +133,36 @@ const {
 	let currentPage = 1;
 	const totalPages = slider ? parseInt(slider.max) : 1;
 
+	async function syncProgress(page: number) {
+		if (!totalPages || totalPages === 0) return;
+		const root = document.getElementById('manga-reader-root');
+		const mangaId = root?.getAttribute('data-manga-id') || 'manga';
+		const mangaTitle = root?.getAttribute('data-manga-title') || 'Manga';
+		const chapterNumber = parseInt(root?.getAttribute('data-chapter-number') || '1');
+		const percent = Math.min(100, Math.round((page / totalPages) * 100));
+
+		try {
+			await fetch('/api/progress/update', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({
+					mediaId: mangaId.includes(':') ? mangaId : `mangadex:${mangaId}`,
+					sourceId: mangaId.includes(':') ? mangaId.split(':')[0] : 'mangadex',
+					sourceTitleId: mangaId.includes(':') ? mangaId.split(':')[1] : mangaId,
+					title: mangaTitle,
+					type: 'manga',
+					contentType: 'chapter',
+					contentId: `ch-${chapterNumber}`,
+					contentNumber: chapterNumber,
+					progressPercent: percent
+				})
+			});
+		} catch (err) {}
+	}
+
+	// Initial sync
+	syncProgress(1);
+
 	// Sync scroll with page counter
 	canvas?.addEventListener("scroll", () => {
 		const pageNodes = document.querySelectorAll(".page-container");
@@ -143,6 +173,7 @@ const {
 				if (slider) slider.value = currentPage.toString();
 				if (counterDisplay)
 					counterDisplay.textContent = `Page ${currentPage} of ${totalPages}`;
+				syncProgress(currentPage);
 			}
 		});
 	});

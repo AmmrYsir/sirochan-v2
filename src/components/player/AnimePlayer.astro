@@ -30,7 +30,7 @@ const isEmbedUrl = !videoUrl ||
                    !videoUrl.match(/\.(mp4|m3u8|webm|ogg|mov)(\?.*)?$/i);
 ---
 
-<div class="anime-player-root">
+<div class="anime-player-root" id="anime-player-root" data-anime-id={animeId} data-anime-title={animeTitle} data-episode-number={episodeNumber}>
   <!-- Minimal Header Bar -->
   <header class="player-header">
     <div class="header-left">
@@ -232,15 +232,39 @@ const isEmbedUrl = !videoUrl ||
     video.addEventListener('play', updatePlayUI);
     video.addEventListener('pause', updatePlayUI);
 
+    let lastSyncTime = 0;
     video.addEventListener('timeupdate', () => {
       if (video.duration) {
         const pct = (video.currentTime / video.duration) * 100;
         if (seekerInput) seekerInput.value = pct.toString();
         if (seekerFill) seekerFill.style.width = `${pct}%`;
         if (seekerThumb) seekerThumb.style.left = `${pct}%`;
+        if (timeDisplay) timeDisplay.textContent = `${formatTime(video.currentTime)} / ${formatTime(video.duration)}`;
 
-        if (timeDisplay) {
-          timeDisplay.textContent = `${formatTime(video.currentTime)} / ${formatTime(video.duration)}`;
+        // Sync to DB every 10 seconds
+        if (Math.abs(video.currentTime - lastSyncTime) > 10) {
+          lastSyncTime = video.currentTime;
+          const root = document.getElementById('anime-player-root');
+          const aId = root?.getAttribute('data-anime-id') || 'anime';
+          const aTitle = root?.getAttribute('data-anime-title') || 'Anime';
+          const epNum = parseInt(root?.getAttribute('data-episode-number') || '1');
+
+          fetch('/api/progress/update', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              mediaId: aId.includes(':') ? aId : `spankbang:${aId}`,
+              sourceId: aId.includes(':') ? aId.split(':')[0] : 'spankbang',
+              sourceTitleId: aId.includes(':') ? aId.split(':')[1] : aId,
+              title: aTitle,
+              type: 'anime',
+              contentType: 'episode',
+              contentId: `ep-${epNum}`,
+              contentNumber: epNum,
+              timeMarkerSeconds: Math.floor(video.currentTime),
+              progressPercent: Math.min(100, Math.round(pct))
+            })
+          }).catch(() => {});
         }
       }
     });

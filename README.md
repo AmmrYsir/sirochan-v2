@@ -4,7 +4,29 @@ Sirochan v2 is a high-performance, dark-mode unified platform for **Manga Readin
 
 ---
 
-## 🌟 Architecture & Microservices
+## 🌟 Key Features & Improvements
+
+- **Mobile-First & Multi-Screen Viewport Architecture**:
+  - **Mobile (< 768px)**: Ergonomic glassmorphic bottom navigation bar (`NavigationBar.astro`), compact spotlight cards, touch-optimized swipe containers.
+  - **Tablet (768px – 1024px)**: Left Rail Sidebar Navigation (`SidebarNav.astro`) with icon tooltips and compact branding.
+  - **Laptop & Desktop (1024px – 1440px)**: Full vertical Sidebar Navigation with menu items (*Home*, *Discover*, *Library*, *Profile*), day streak counter, user status widget, and collapse/expand toggle.
+  - **Ultra-Wide Screens (> 1440px / 1600px+)**: Fluid multi-column media grids scaling up to 6–8 columns on 4K/2K desktop monitors.
+- **Privacy Protection & URL Obfuscation Layer**:
+  - Converts readable title and chapter URLs into short, anonymous, encrypted hash tokens ([privacy.ts](file:///c:/Users/ammar/Desktop/sirochan-v2/src/utils/privacy.ts)).
+  - **Anonymous Protected Routes**: Media Details (`/v/[token]`), Manga Reader (`/read/[token]`), Anime Player (`/watch/[token]`).
+  - Browser address bars, window titles, tab labels, browser history, and network logs reveal **ZERO plain text titles, categories, or chapter numbers**.
+- **Real Database Library & Bookmark Sync**:
+  - Direct PostgreSQL persistence via Drizzle ORM for `bookmarks`, `user_progress`, and `media` tables.
+  - Real-time bookmarking on media pages (`POST /api/library/bookmark`) and progress tracking in reader/player components (`POST /api/progress/update`).
+  - **My Library** ([library.astro](file:///c:/Users/ammar/Desktop/sirochan-v2/src/pages/library.astro)) renders user's real saved titles across *All*, *In Progress*, *Bookmarked*, *Favorites*, and *History* tabs.
+- **Live Data Microservice Integration**:
+  - Connects directly to Loouwd FastAPI microservices core ([apiService.ts](file:///c:/Users/ammar/Desktop/sirochan-v2/src/db/apiService.ts)) to stream live catalog items, covers, chapters, and HLS/MP4 playback feeds.
+- **Strict Environment Validation**:
+  - Strict validation for `DATABASE_URL` and `LOOUWD_URL` in `.env` without assuming or hardcoding silent fallbacks.
+
+---
+
+## 🛠️ Architecture & Microservices
 
 Sirochan v2 operates as an integrated frontend & local backend orchestrating two core microservices:
 
@@ -56,9 +78,9 @@ cp .env.example .env
 # Database connection string (Port 5433 avoids conflict with existing local Postgres on 5432)
 DATABASE_URL=postgresql://sirochan:sirochan_secret@localhost:5433/sirochan_db
 
-# Microservice Endpoints (Use host.docker.internal when app runs in Docker and services are on host)
-LOOUWD_URL=http://host.docker.internal:8000
-AUTH_URL=http://host.docker.internal:3000
+# Microservice Endpoints
+LOOUWD_URL=http://localhost:8000
+AUTH_URL=http://localhost:3000
 ```
 
 ### 3. Install Dependencies & Push DB Schema
@@ -83,7 +105,7 @@ Visit the app at [http://localhost:4321](http://localhost:4321).
 | Command | Action |
 | :--- | :--- |
 | `bun dev` | Starts local dev server at `localhost:4321` |
-| `bun astro check` | Runs full TypeScript diagnostic check across all components |
+| `bun astro check` | Runs full TypeScript diagnostic check across all 44 Astro components |
 | `bun run build` | Builds the production SSR bundle to `./dist/` |
 | `bun run start` | Runs production SSR standalone server entrypoint (`dist/server/entry.mjs`) |
 | `bun run preview` | Previews production build locally |
@@ -102,7 +124,7 @@ Visit the app at [http://localhost:4321](http://localhost:4321).
 ├── src/
 │   ├── components/
 │   │   ├── common/         # Badges, Buttons, Lightbox ImageViewer
-│   │   ├── layout/         # Header, NavigationBar
+│   │   ├── layout/         # Header, NavigationBar, SidebarNav
 │   │   ├── media/          # HeroBanner, AnimeCard, MangaCard, EditorialItem
 │   │   ├── player/         # Custom AnimePlayer video player component
 │   │   └── reader/         # Custom MangaReader canvas component
@@ -110,18 +132,23 @@ Visit the app at [http://localhost:4321](http://localhost:4321).
 │   │   ├── apiService.ts   # Loouwd microservice API client
 │   │   ├── client.ts       # Drizzle PostgreSQL connection client
 │   │   └── schema.ts       # Drizzle ORM database schema definitions
-│   ├── layouts/            # MainLayout shell
+│   ├── layouts/            # MainLayout shell with adaptive sidebar/bottom-bar wrapper
 │   ├── lib/
 │   │   └── authClient.ts   # SushiGuard Auth microservice client
 │   ├── pages/
-│   │   ├── api/            # Server endpoints (auth, progress, bookmarks)
-│   │   ├── [sourceId]/     # Title details and Chapter/Episode viewer routes
+│   │   ├── api/            # Server endpoints (auth, progress, library/bookmark)
+│   │   ├── read/           # Privacy-protected Manga Reader route (/read/[token])
+│   │   ├── watch/          # Privacy-protected Anime Player route (/watch/[token])
+│   │   ├── v/              # Privacy-protected Media Detail route (/v/[token])
+│   │   ├── [sourceId]/     # Legacy catalog viewer routes
 │   │   ├── discover.astro  # Catalog search & genre filters
-│   │   ├── index.astro     # Editorial home feed
-│   │   ├── library.astro   # User bookmark library
+│   │   ├── index.astro     # Editorial home feed with live items & spotlight banner
+│   │   ├── library.astro   # Real user bookmark & progress library
 │   │   ├── login.astro     # Japanese Editorial Login UI
-│   │   └── profile.astro   # User statistics & reader preferences
-│   ├── styles/             # Global CSS design tokens
+│   │   └── profile.astro   # User statistics & reader preferences dashboard
+│   ├── styles/             # Global CSS design tokens & responsive grid utilities
+│   ├── utils/
+│   │   └── privacy.ts      # Privacy token encoder/decoder utility
 │   ├── middleware.ts       # Astro JWT session & PostgreSQL profile sync middleware
 │   └── env.d.ts            # Astro App.Locals typing declarations
 ├── .env.example            # Environment variables template
