@@ -1,10 +1,11 @@
 import type { MediaSource, SourceTagSuggestion } from '../types';
 
 async function fetchLoouwd(path: string, options?: RequestInit): Promise<Response> {
-  const baseUrl = (process.env.LOOUWD_URL || '').replace(/\/$/, '');
-  if (!baseUrl) {
-    console.warn('[ApiService] LOOUWD_URL is not set in environment (.env)');
+  const envUrl = process.env.LOOUWD_URL || (import.meta as any).env?.LOOUWD_URL;
+  if (!envUrl) {
+    throw new Error('[ApiService Error] LOOUWD_URL environment variable is missing. Please set LOOUWD_URL in your .env file.');
   }
+  const baseUrl = envUrl.replace(/\/$/, '');
   return fetch(`${baseUrl}${path}`, options);
 }
 
