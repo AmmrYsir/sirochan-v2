@@ -1,0 +1,32 @@
+User-agent: *
+Allow: /
+Disallow: /login
+Disallow: /profile
+Disallow: /library
+Disallow: /read/
+Disallow: /watch/
+Disallow: /v/
+Disallow: /api/
+
+# Block known scanner paths (defense-in-depth; also handled by nginx + fail2ban)
+Disallow: /.env
+Disallow: /.git
+Disallow: /config
+Disallow: /backup
+Disallow: /dump.sql
+Disallow: /wp-admin
+Disallow: /actuator
+Disallow: /storage
+Disallow: /etc
+
+# AI crawlers — explicitly allow content discovery
+User-agent: GPTBot
+Allow: /
+User-agent: ClaudeBot
+Allow: /
+User-agent: Google-Extended
+Allow: /
+User-agent: CCBot
+Allow: /
+
+Sitemap: https://sirochan.enciknao.com/sitemap.xml
