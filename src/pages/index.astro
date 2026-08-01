@@ -10,6 +10,7 @@ import { db } from '../db/client';
 import { userProgress } from '../db/schema';
 import { eq, desc } from 'drizzle-orm';
 import { getPrivacyTitleUrl } from '../utils/privacy';
+import { MANGA_PLACEHOLDER, ANIME_PLACEHOLDER } from '../utils/placeholders';
 
 const user = Astro.locals.user;
 const userName = user?.username || 'Arata';
@@ -54,10 +55,8 @@ if (user) {
           sourceTitleId: titleId,
           title: cached?.title || liveDetails?.title || titleId || 'In Progress',
           type: isAnime ? 'anime' : 'manga',
-          coverImage: cached?.coverImage || liveDetails?.thumbnailUrl || (isAnime 
-            ? 'https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=600&q=80'
-            : 'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?auto=format&fit=crop&w=600&q=80'),
-          bannerImage: cached?.bannerImage || liveDetails?.thumbnailUrl,
+          coverImage: cached?.coverImage || liveDetails?.thumbnailUrl || (isAnime ? ANIME_PLACEHOLDER : MANGA_PLACEHOLDER),
+          bannerImage: cached?.bannerImage || liveDetails?.thumbnailUrl || ANIME_PLACEHOLDER,
           description: cached?.description || liveDetails?.description || 'In progress media.',
           rating: cached?.rating || liveDetails?.rating || 4.9,
           status: 'RELEASING' as const,
@@ -106,10 +105,8 @@ try {
           title: item.title,
           japaneseTitle: item.title,
           type: item.mediaType,
-          coverImage: item.thumbnailUrl || (isAnime 
-            ? 'https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=600&q=80'
-            : 'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?auto=format&fit=crop&w=600&q=80'),
-          bannerImage: item.thumbnailUrl || 'https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=1600&q=80',
+          coverImage: item.thumbnailUrl || (isAnime ? ANIME_PLACEHOLDER : MANGA_PLACEHOLDER),
+          bannerImage: item.thumbnailUrl || ANIME_PLACEHOLDER,
           description: item.description || `Read or watch ${item.title} live on Sirochan v2.`,
           rating: item.rating || 4.9,
           status: 'RELEASING' as const,

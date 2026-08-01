@@ -1,20 +1,44 @@
 ---
 import MainLayout from '../layouts/MainLayout.astro';
 import Button from '../components/common/Button.astro';
-import { currentUser } from '../db/mockData';
+import { db } from '../db/client';
+import { users } from '../db/schema';
+import { eq } from 'drizzle-orm';
+
+const user = Astro.locals.user;
+
+if (!user) {
+  return Astro.redirect('/login');
+}
+
+const dbUser = await db.query.users.findFirst({
+  where: eq(users.id, user.id)
+});
+
+const profile = {
+  id: user.id,
+  username: dbUser?.username || user.username || 'User',
+  handle: dbUser?.handle || `@${(dbUser?.username || user.username || 'user').toLowerCase()}`,
+  avatar: dbUser?.avatar || `https://api.dicebear.com/7.x/bottts/svg?seed=${encodeURIComponent(user.id)}`,
+  chaptersRead: dbUser?.chaptersRead || 0,
+  hoursWatched: dbUser?.hoursWatched || 0,
+  readingStreakDays: dbUser?.readingStreakDays || 1,
+  preferredReaderMode: dbUser?.preferredReaderMode || 'continuous',
+  preferredStreamQuality: dbUser?.preferredStreamQuality || '1080p'
+};
 ---
 
 <MainLayout title="Profile - Sirochan" activeTab="profile">
   <div class="profile-page container-constrained">
     <!-- User Header Banner Card -->
     <div class="user-header-card">
-      <img src={currentUser.avatar} alt={currentUser.username} class="avatar" />
+      <img src={profile.avatar} alt={profile.username} class="avatar" />
       <div class="user-info">
         <div class="name-row">
-          <h1 class="user-name">{currentUser.username}</h1>
+          <h1 class="user-name">{profile.username}</h1>
           <span class="member-badge">PRO MEMBER</span>
         </div>
-        <p class="user-handle">{currentUser.handle}</p>
+        <p class="user-handle">{profile.handle}</p>
         <p class="user-bio">Manga enthusiast & Anime streaming connoisseur on Sirochan v2.</p>
       </div>
     </div>
@@ -26,15 +50,15 @@ import { currentUser } from '../db/mockData';
         <h2 class="section-heading">ACTIVITY & STATS</h2>
         <div class="stats-grid">
           <div class="stat-box">
-            <span class="stat-value">{currentUser.chaptersRead}</span>
+            <span class="stat-value">{profile.chaptersRead}</span>
             <span class="stat-label">Chapters Read</span>
           </div>
           <div class="stat-box">
-            <span class="stat-value">{currentUser.hoursWatched}h</span>
+            <span class="stat-value">{profile.hoursWatched}h</span>
             <span class="stat-label">Hours Watched</span>
           </div>
           <div class="stat-box highlight">
-            <span class="stat-value">{currentUser.readingStreakDays} 🔥</span>
+            <span class="stat-value">{profile.readingStreakDays} 🔥</span>
             <span class="stat-label">Day Streak</span>
           </div>
         </div>
@@ -57,9 +81,9 @@ import { currentUser } from '../db/mockData';
               <span class="setting-name">Default Reader Mode</span>
               <span class="setting-desc">Single Page vs Continuous Scroll</span>
             </div>
-            <select class="setting-select">
-              <option value="continuous" selected={currentUser.preferredReaderMode === 'continuous'}>Continuous Scroll</option>
-              <option value="single" selected={currentUser.preferredReaderMode === 'single'}>Single Page</option>
+            <select class="setting-select" id="pref-reader-mode">
+              <option value="continuous" selected={profile.preferredReaderMode === 'continuous'}>Continuous Scroll</option>
+              <option value="single" selected={profile.preferredReaderMode === 'single'}>Single Page</option>
             </select>
           </div>
 
@@ -68,9 +92,9 @@ import { currentUser } from '../db/mockData';
               <span class="setting-name">Anime Stream Quality</span>
               <span class="setting-desc">Preferred streaming resolution</span>
             </div>
-            <select class="setting-select">
-              <option value="1080p" selected={currentUser.preferredStreamQuality === '1080p'}>1080p Full HD</option>
-              <option value="720p" selected={currentUser.preferredStreamQuality === '720p'}>720p HD</option>
+            <select class="setting-select" id="pref-stream-quality">
+              <option value="1080p" selected={profile.preferredStreamQuality === '1080p'}>1080p Full HD</option>
+              <option value="720p" selected={profile.preferredStreamQuality === '720p'}>720p HD</option>
               <option value="auto">Auto Adaptive</option>
             </select>
           </div>
@@ -85,12 +109,26 @@ import { currentUser } from '../db/mockData';
         </div>
 
         <div class="action-footer">
-          <Button variant="secondary" size="lg" class="w-full">LOG OUT</Button>
+          <Button id="logout-btn" variant="secondary" size="lg" class="w-full">LOG OUT</Button>
         </div>
       </div>
     </div>
   </div>
 </MainLayout>
+
+<script>
+  const logoutBtn = document.getElementById('logout-btn');
+  if (logoutBtn) {
+    logoutBtn.addEventListener('click', async () => {
+      try {
+        await fetch('/api/auth/logout', { method: 'POST' });
+        window.location.href = '/login';
+      } catch (e) {
+        window.location.href = '/login';
+      }
+    });
+  }
+</script>
 
 <style>
   .profile-page {

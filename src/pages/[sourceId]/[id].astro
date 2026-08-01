@@ -4,7 +4,7 @@ import Button from '../../components/common/Button.astro';
 import Badge from '../../components/common/Badge.astro';
 import { ApiService } from '../../db/apiService';
 import { db } from '../../db/client';
-import { bookmarks } from '../../db/schema';
+import { bookmarks, media } from '../../db/schema';
 import { eq, and } from 'drizzle-orm';
 import { MANGA_PLACEHOLDER, ANIME_PLACEHOLDER } from '../../utils/placeholders';
 
@@ -53,34 +53,24 @@ const rawDesc = liveTitleDetails?.description
 const rawDate = liveTitleDetails?.updatedAt || liveTitleDetails?.releasedAt || null;
 const humanDate = formatHumanDate(rawDate);
 
-const item = liveTitleDetails ? {
-  id: liveTitleDetails.sourceTitleId,
+const dbMedia = await db.query.media.findFirst({
+  where: eq(media.id, `${sourceId}:${liveTitleDetails?.sourceTitleId || id}`)
+});
+
+const item = {
+  id: liveTitleDetails?.sourceTitleId || dbMedia?.sourceTitleId || id || 'title',
   sourceId: sourceId,
-  title: liveTitleDetails.title,
-  japaneseTitle: liveTitleDetails.altTitles?.[0] || liveTitleDetails.title,
-  type: liveTitleDetails.mediaType || 'manga',
-  coverImage: liveTitleDetails.thumbnailUrl || 'https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=600&q=80',
-  bannerImage: liveTitleDetails.thumbnailUrl || 'https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=1600&q=80',
-  description: rawDesc || 'Live metadata title details fetched directly from microservice adapter.',
-  rating: liveTitleDetails.rating || 4.8,
-  status: (liveTitleDetails.status?.toUpperCase() || 'RELEASING') as any,
-  genres: liveTitleDetails.tags?.length > 0 ? liveTitleDetails.tags : ['Action', 'Fantasy'],
-  latestChapterOrEpisode: `CH. ${liveTitleDetails.totalChapters || 1}`,
+  title: liveTitleDetails?.title || dbMedia?.title || id?.replace(/-/g, ' ').toUpperCase() || 'TITLE',
+  japaneseTitle: liveTitleDetails?.altTitles?.[0] || dbMedia?.japaneseTitle || '',
+  type: (liveTitleDetails?.mediaType || dbMedia?.type || 'manga') as 'manga' | 'anime',
+  coverImage: liveTitleDetails?.thumbnailUrl || dbMedia?.coverImage || MANGA_PLACEHOLDER,
+  bannerImage: liveTitleDetails?.thumbnailUrl || dbMedia?.bannerImage || ANIME_PLACEHOLDER,
+  description: rawDesc || dbMedia?.description || 'Live title details.',
+  rating: liveTitleDetails?.rating || dbMedia?.rating || 4.8,
+  status: ((liveTitleDetails?.status || dbMedia?.status || 'RELEASING').toUpperCase()) as any,
+  genres: (liveTitleDetails?.tags?.length ? liveTitleDetails.tags : dbMedia?.genres) || ['Media'],
+  latestChapterOrEpisode: `CH. ${liveTitleDetails?.totalChapters || dbMedia?.totalChapters || 1}`,
   humanDate: humanDate
-} : {
-  id: id || 'title',
-  sourceId: sourceId,
-  title: id?.replace(/-/g, ' ').toUpperCase() || 'TITLE',
-  japaneseTitle: '',
-  type: 'manga' as const,
-  coverImage: 'https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=600&q=80',
-  bannerImage: 'https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=1600&q=80',
-  description: 'Live title details from microservice.',
-  rating: 4.8,
-  status: 'RELEASING' as const,
-  genres: ['Manga'],
-  latestChapterOrEpisode: 'CH. 1',
-  humanDate: null
 };
 
 const mediaId = `${sourceId}:${item.id}`;

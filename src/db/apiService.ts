@@ -14,6 +14,14 @@ const memoryCache = new Map<string, { data: any; expiry: number }>();
 
 import { getSourceBrand } from '../utils/sourceIcons';
 
+export function proxyMediaUrl(url?: string): string {
+	if (!url) return '';
+	if (url.startsWith('data:')) return url;
+	if (url.startsWith('/api/proxy/image')) return url;
+	const cleanUrl = url.replace(/host\.docker\.internal/gi, 'localhost');
+	return `/api/proxy/image?url=${encodeURIComponent(cleanUrl)}`;
+}
+
 function getCached<T>(key: string): T | null {
 	const item = memoryCache.get(key);
 	if (item && item.expiry > Date.now()) {
@@ -239,6 +247,12 @@ export class ApiService {
 			});
 			if (!res.ok) throw new Error(`HTTP error ${res.status}`);
 			const result: SourceBrowseResult = await res.json();
+			if (result.items) {
+				result.items = result.items.map(item => ({
+					...item,
+					thumbnailUrl: item.thumbnailUrl ? proxyMediaUrl(item.thumbnailUrl) : item.thumbnailUrl
+				}));
+			}
 			setCached(cacheKey, result, 60000);
 			return result;
 		} catch (err) {
@@ -262,6 +276,9 @@ export class ApiService {
 			});
 			if (!res.ok) throw new Error(`HTTP error ${res.status}`);
 			const result: SourceTitleDetails = await res.json();
+			if (result && result.thumbnailUrl) {
+				result.thumbnailUrl = proxyMediaUrl(result.thumbnailUrl);
+			}
 			setCached(cacheKey, result, 60000);
 			return result;
 		} catch (err) {
