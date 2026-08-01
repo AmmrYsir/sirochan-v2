@@ -1,11 +1,14 @@
 import type { APIRoute } from 'astro';
+import { cleanImageUrl } from '../../../utils/thumbnailCache';
 
 export const GET: APIRoute = async ({ request }) => {
-	const urlParam = new URL(request.url).searchParams.get('url');
+	let urlParam = new URL(request.url).searchParams.get('url');
 
 	if (!urlParam) {
 		return new Response('Missing url parameter', { status: 400 });
 	}
+
+	urlParam = cleanImageUrl(urlParam);
 
 	// Detect LOOUWD_URL from process environment
 	const loouwdBase = process.env.LOOUWD_URL || (import.meta as any).env?.LOOUWD_URL;
@@ -41,11 +44,19 @@ export const GET: APIRoute = async ({ request }) => {
 	// Try candidate URLs until one succeeds
 	for (const targetUrl of candidateUrls) {
 		try {
+			let referer = 'https://nhentai.net/';
+			try {
+				if (targetUrl.startsWith('http')) {
+					referer = `${new URL(targetUrl).origin}/`;
+				}
+			} catch (e) {}
+
 			const fetchRes = await fetch(targetUrl, {
 				headers: {
-					'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+					'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+					'Referer': referer
 				},
-				signal: AbortSignal.timeout(3000)
+				signal: AbortSignal.timeout(4000)
 			});
 
 			if (fetchRes.ok) {

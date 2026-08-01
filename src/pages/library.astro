@@ -4,8 +4,9 @@ import MangaCard from '../components/media/MangaCard.astro';
 import AnimeCard from '../components/media/AnimeCard.astro';
 import { ApiService } from '../db/apiService';
 import { MANGA_PLACEHOLDER, ANIME_PLACEHOLDER } from '../utils/placeholders';
+import { cacheThumbnailLocally } from '../utils/thumbnailCache';
 import { db } from '../db/client';
-import { bookmarks, userProgress } from '../db/schema';
+import { bookmarks, userProgress, media } from '../db/schema';
 import { eq, desc } from 'drizzle-orm';
 
 const user = Astro.locals.user;
@@ -21,21 +22,18 @@ if (user) {
       orderBy: [desc(bookmarks.createdAt)]
     });
 
-    const bookmarkedMediaIds = dbBookmarks.map(b => b.mediaId);
-
     // 2. Fetch real DB progress for user
     const dbProgress = await db.query.userProgress.findMany({
       where: eq(userProgress.userId, user.id),
       orderBy: [desc(userProgress.lastReadOrWatchedAt)]
     });
 
-    const progressMediaIds = dbProgress.map(p => p.mediaId);
-    const allRelevantIds = Array.from(new Set([...bookmarkedMediaIds, ...progressMediaIds]));
-
+    const mediaIds = [...new Set([...dbBookmarks.map(b => b.mediaId), ...dbProgress.map(p => p.mediaId)])];
+    
     // Fetch cached media entries from DB
-    const mediaEntries = allRelevantIds.length > 0
+    const mediaEntries = mediaIds.length > 0
       ? await db.query.media.findMany({
-          where: (table, { inArray }) => inArray(table.id, allRelevantIds)
+          where: (table, { inArray }) => inArray(table.id, mediaIds)
         })
       : [];
 
@@ -55,13 +53,24 @@ if (user) {
       const title = cached?.title || liveDetails?.title || titleId || 'Saved Media';
       const isAnime = (cached?.type || liveDetails?.mediaType) === 'anime';
 
+      const hasValidCachedCover = cached?.coverImage && !cached.coverImage.startsWith('data:');
+      let finalCover = (hasValidCachedCover ? cached.coverImage : null) || liveDetails?.thumbnailUrl || (isAnime ? ANIME_PLACEHOLDER : MANGA_PLACEHOLDER);
+
+      if (!hasValidCachedCover && liveDetails?.thumbnailUrl) {
+        const localPath = await cacheThumbnailLocally(b.mediaId, liveDetails.thumbnailUrl);
+        if (localPath) {
+          finalCover = localPath;
+          await db.update(media).set({ coverImage: localPath }).where(eq(media.id, b.mediaId));
+        }
+      }
+
       return {
         id: titleId,
         sourceId: srcId,
         sourceTitleId: titleId,
         title,
         type: isAnime ? 'anime' : 'manga',
-        coverImage: cached?.coverImage || liveDetails?.thumbnailUrl || (isAnime ? ANIME_PLACEHOLDER : MANGA_PLACEHOLDER),
+        coverImage: finalCover,
         bannerImage: cached?.bannerImage || liveDetails?.thumbnailUrl || ANIME_PLACEHOLDER,
         description: cached?.description || liveDetails?.description || 'Bookmarked in library.',
         rating: cached?.rating || liveDetails?.rating || 4.9,
@@ -86,13 +95,24 @@ if (user) {
       const title = cached?.title || liveDetails?.title || titleId || 'In Progress';
       const isAnime = p.contentType === 'episode' || (cached?.type || liveDetails?.mediaType) === 'anime';
 
+      const hasValidCachedCover = cached?.coverImage && !cached.coverImage.startsWith('data:');
+      let finalCover = (hasValidCachedCover ? cached.coverImage : null) || liveDetails?.thumbnailUrl || (isAnime ? ANIME_PLACEHOLDER : MANGA_PLACEHOLDER);
+
+      if (!hasValidCachedCover && liveDetails?.thumbnailUrl) {
+        const localPath = await cacheThumbnailLocally(p.mediaId, liveDetails.thumbnailUrl);
+        if (localPath) {
+          finalCover = localPath;
+          await db.update(media).set({ coverImage: localPath }).where(eq(media.id, p.mediaId));
+        }
+      }
+
       return {
         id: titleId,
         sourceId: srcId,
         sourceTitleId: titleId,
         title,
         type: isAnime ? 'anime' : 'manga',
-        coverImage: cached?.coverImage || liveDetails?.thumbnailUrl || (isAnime ? ANIME_PLACEHOLDER : MANGA_PLACEHOLDER),
+        coverImage: finalCover,
         bannerImage: cached?.bannerImage || liveDetails?.thumbnailUrl || ANIME_PLACEHOLDER,
         description: cached?.description || liveDetails?.description || 'In progress media.',
         rating: cached?.rating || liveDetails?.rating || 4.9,

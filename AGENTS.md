@@ -57,7 +57,21 @@ All database operations must use Drizzle ORM defined in `src/db/schema.ts` and i
 ### Database & Quality Commands
 - `bun run db:generate`: Create SQL migration file from updated `schema.ts`.
 - `bun run db:push`: Synchronize schema directly with PostgreSQL database.
-- `bun astro check`: Run TypeScript diagnostic check across all 44 Astro components & TypeScript files.
+- `bun astro check`: Run TypeScript diagnostic check across all Astro components & TypeScript files.
+
+---
+
+## 🖼️ Local Disk Thumbnail Caching & Re-Cache Architecture
+
+- **Thumbnail Persistence ([thumbnailCache.ts](file:///c:/Users/ammar/Desktop/sirochan-v2/src/utils/thumbnailCache.ts))**:
+  - `cacheThumbnailLocally(mediaId, remoteUrl)` fetches remote cover images server-side and saves binary files locally to `./public/cache/covers/[safeMediaId].jpg`.
+  - The local static URL string `/cache/covers/[safeMediaId].jpg` is saved in PostgreSQL `media.coverImage`.
+- **Instant Cache Re-use**:
+  - When users navigate from Dashboard (*Continue Reading/Watching*) or Library, routes instantly reuse the cached PostgreSQL record and local disk thumbnail with zero external network latency.
+- **Manual Re-Cache Endpoint (`POST /api/media/recache`)**:
+  - Detail view (`/v/[token]`) provides a **SYNC / RE-CACHE** button to re-fetch live metadata and update the local cover binary on demand.
+- **Browsing Page Exemption**:
+  - Catalog browsing pages (`/discover`, `/sources/*`) remain 100% driven by live microservice API requests.
 
 ---
 

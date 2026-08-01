@@ -1,6 +1,8 @@
 import type { APIRoute } from 'astro';
 import { db } from '../../../db/client';
 import { userProgress, media } from '../../../db/schema';
+import { cacheThumbnailLocally } from '../../../utils/thumbnailCache';
+import { ApiService } from '../../../db/apiService';
 
 export const POST: APIRoute = async ({ request, locals }) => {
   if (!locals.user) {
@@ -38,6 +40,19 @@ export const POST: APIRoute = async ({ request, locals }) => {
       });
     }
 
+    // Resolve real remote cover URL if client passed data URI
+    let realRemoteCover = coverImage;
+    if ((!realRemoteCover || realRemoteCover.startsWith('data:')) && sourceId && (sourceTitleId || mediaId)) {
+      const targetTitleId = sourceTitleId || (mediaId.includes(':') ? mediaId.split(':')[1] : mediaId);
+      const live = await ApiService.getTitleDetails(sourceId, targetTitleId);
+      if (live?.thumbnailUrl) {
+        realRemoteCover = live.thumbnailUrl;
+      }
+    }
+
+    // Cache cover thumbnail locally if available
+    const localCoverPath = realRemoteCover ? await cacheThumbnailLocally(mediaId, realRemoteCover) : null;
+
     // Upsert full media metadata into PostgreSQL
     if (sourceId && title) {
       await db.insert(media).values({
@@ -47,7 +62,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
         title,
         japaneseTitle: japaneseTitle || null,
         type: type || (contentType === 'chapter' ? 'manga' : 'anime'),
-        coverImage: coverImage || null,
+        coverImage: localCoverPath || coverImage || null,
         bannerImage: bannerImage || null,
         description: description || null,
         rating: rating ? parseFloat(rating) : 4.8,
@@ -58,7 +73,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
         target: media.id,
         set: {
           title,
-          coverImage: coverImage ? coverImage : undefined,
+          coverImage: localCoverPath || coverImage || undefined,
           bannerImage: bannerImage ? bannerImage : undefined,
           description: description ? description : undefined,
           genres: Array.isArray(genres) && genres.length > 0 ? genres : undefined,
@@ -92,7 +107,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
       }
     });
 
-    return new Response(JSON.stringify({ success: true }), {
+    return new Response(JSON.stringify({ success: true, coverImage: localCoverPath }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' }
     });

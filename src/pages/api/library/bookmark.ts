@@ -2,6 +2,8 @@ import type { APIRoute } from 'astro';
 import { db } from '../../../db/client';
 import { bookmarks, media } from '../../../db/schema';
 import { eq, and } from 'drizzle-orm';
+import { cacheThumbnailLocally } from '../../../utils/thumbnailCache';
+import { ApiService } from '../../../db/apiService';
 
 export const POST: APIRoute = async ({ request, locals }) => {
   if (!locals.user) {
@@ -49,6 +51,19 @@ export const POST: APIRoute = async ({ request, locals }) => {
       return new Response(JSON.stringify({ success: true, isBookmarked: false }), { status: 200 });
     }
 
+    // Resolve real remote cover URL if client passed data URI
+    let realRemoteCover = coverImage;
+    if ((!realRemoteCover || realRemoteCover.startsWith('data:')) && sourceId && (sourceTitleId || mediaId)) {
+      const targetTitleId = sourceTitleId || (mediaId.includes(':') ? mediaId.split(':')[1] : mediaId);
+      const live = await ApiService.getTitleDetails(sourceId, targetTitleId);
+      if (live?.thumbnailUrl) {
+        realRemoteCover = live.thumbnailUrl;
+      }
+    }
+
+    // Cache thumbnail binary locally to ./public/cache/covers/[mediaId].jpg
+    const localCoverPath = realRemoteCover ? await cacheThumbnailLocally(mediaId, realRemoteCover) : null;
+
     // Upsert full media metadata into PostgreSQL
     if (sourceId && title) {
       await db.insert(media).values({
@@ -58,7 +73,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
         title,
         japaneseTitle: japaneseTitle || null,
         type: type || 'manga',
-        coverImage: coverImage || null,
+        coverImage: localCoverPath || coverImage || null,
         bannerImage: bannerImage || null,
         description: description || null,
         rating: rating ? parseFloat(rating) : 4.8,
@@ -72,7 +87,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
         set: {
           title,
           japaneseTitle: japaneseTitle || null,
-          coverImage: coverImage || null,
+          coverImage: localCoverPath || coverImage || null,
           bannerImage: bannerImage || null,
           description: description || null,
           rating: rating ? parseFloat(rating) : 4.8,
@@ -96,7 +111,7 @@ export const POST: APIRoute = async ({ request, locals }) => {
       }
     });
 
-    return new Response(JSON.stringify({ success: true, isBookmarked: true, folder }), {
+    return new Response(JSON.stringify({ success: true, isBookmarked: true, folder, coverImage: localCoverPath }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' }
     });

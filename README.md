@@ -15,12 +15,12 @@ Sirochan v2 is a high-performance, dark-mode unified platform for **Manga Readin
   - Converts readable title and chapter URLs into short, anonymous, encrypted hash tokens ([privacy.ts](file:///c:/Users/ammar/Desktop/sirochan-v2/src/utils/privacy.ts)).
   - **Anonymous Protected Routes**: Media Details (`/v/[token]`), Manga Reader (`/read/[token]`), Anime Player (`/watch/[token]`).
   - Browser address bars, window titles, tab labels, browser history, and network logs reveal **ZERO plain text titles, categories, or chapter numbers**.
-- **Real Database Library & Bookmark Sync**:
-  - Direct PostgreSQL persistence via Drizzle ORM for `bookmarks`, `user_progress`, and `media` tables.
-  - Real-time bookmarking on media pages (`POST /api/library/bookmark`) and progress tracking in reader/player components (`POST /api/progress/update`).
-  - **My Library** ([library.astro](file:///c:/Users/ammar/Desktop/sirochan-v2/src/pages/library.astro)) renders user's real saved titles across *All*, *In Progress*, *Bookmarked*, *Favorites*, and *History* tabs.
-- **Live Data Microservice Integration**:
-  - Connects directly to Loouwd FastAPI microservices core ([apiService.ts](file:///c:/Users/ammar/Desktop/sirochan-v2/src/db/apiService.ts)) to stream live catalog items, covers, chapters, and HLS/MP4 playback feeds.
+- **Comprehensive Local Caching & Disk Thumbnail Storage**:
+  - Automatically downloads remote cover binaries server-side and persists them to local disk (`./public/cache/covers/[mediaId].jpg`).
+  - Saves local thumbnail static paths and full metadata into PostgreSQL `media` table on every bookmark or reading/watching progress update.
+  - **Instant Cache Re-use**: Dashboard (*Continue Reading / Continue Watching*) and **My Library** instantly render cached database records with 0 network latency.
+  - **Manual Re-Cache Action ("SYNC / RE-CACHE")**: Detail pages include an interactive button to re-fetch live metadata and update the local thumbnail binary on demand (`POST /api/media/recache`).
+  - **Browsing Exemption**: Discover (`/discover`), Source catalog pages (`/sources/*`), and Search remain 100% live API requests.
 - **Strict Environment Validation**:
   - Strict validation for `DATABASE_URL` and `LOOUWD_URL` in `.env` without assuming or hardcoding silent fallbacks.
 

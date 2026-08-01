@@ -163,6 +163,20 @@ const firstChapterUrl = chapters[0]?.privacyUrl || '#';
             </svg>
             <span id="bookmark-btn-text">{isBookmarked ? 'IN LIBRARY' : 'ADD TO BOOKMARKS'}</span>
           </button>
+
+          <!-- Interactive Re-Cache Button -->
+          <button 
+            id="recache-btn" 
+            class="recache-action-btn"
+            data-media-id={mediaId}
+            data-source-id={sourceId}
+            data-source-title-id={item.id}
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
+            </svg>
+            <span id="recache-btn-text">SYNC / RE-CACHE</span>
+          </button>
         </div>
 
         <!-- Meta & Overview -->
@@ -299,6 +313,41 @@ const firstChapterUrl = chapters[0]?.privacyUrl || '#';
     });
   }
 
+  const recacheBtn = document.getElementById('recache-btn');
+  const recacheText = document.getElementById('recache-btn-text');
+
+  if (recacheBtn) {
+    recacheBtn.addEventListener('click', async () => {
+      const mediaId = recacheBtn.getAttribute('data-media-id');
+      const sourceId = recacheBtn.getAttribute('data-source-id');
+      const sourceTitleId = recacheBtn.getAttribute('data-source-title-id');
+
+      if (recacheText) recacheText.textContent = 'SYNCING...';
+
+      try {
+        const res = await fetch('/api/media/recache', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ mediaId, sourceId, sourceTitleId })
+        });
+
+        const data = await res.json();
+        if (data.success) {
+          if (recacheText) recacheText.textContent = 'SYNCED!';
+          setTimeout(() => {
+            window.location.reload();
+          }, 500);
+        } else {
+          alert(data.error || 'Failed to re-cache metadata');
+          if (recacheText) recacheText.textContent = 'SYNC / RE-CACHE';
+        }
+      } catch (e) {
+        alert('Network error while re-caching metadata.');
+        if (recacheText) recacheText.textContent = 'SYNC / RE-CACHE';
+      }
+    });
+  }
+
   if (container) {
     sortBtns.forEach((btn) => {
       btn.addEventListener('click', () => {
@@ -407,6 +456,31 @@ const firstChapterUrl = chapters[0]?.privacyUrl || '#';
     border-color: rgba(230, 57, 70, 0.5);
     background-color: rgba(230, 57, 70, 0.12);
     color: #E63946;
+  }
+
+  .recache-action-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    padding: 10px 16px;
+    background-color: var(--bg-elevated, #1E1E1E);
+    border: 1px solid var(--border-subtle, #2A2A2A);
+    color: var(--text-muted, #a1a1aa);
+    border-radius: var(--radius-md, 12px);
+    font-family: var(--font-mono, monospace);
+    font-size: 0.78rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    margin-top: 8px;
+  }
+
+  .recache-action-btn:hover {
+    border-color: var(--accent-orange, #F4A261);
+    color: #ffffff;
+    background-color: rgba(244, 162, 97, 0.1);
   }
 
   .info-column {
