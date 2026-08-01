@@ -1,17 +1,18 @@
 ---
 import type { MediaItem } from '../../types';
 import { ANIME_PLACEHOLDER } from '../../utils/placeholders';
+import { getPrivacyTitleUrl } from '../../utils/privacy';
 
 interface Props {
   item: MediaItem;
 }
 
 const { item } = Astro.props;
-const targetHref = `/${item.sourceId || 'hianime'}/${item.id}`;
+const targetHref = getPrivacyTitleUrl({ sourceId: item.sourceId, sourceTitleId: item.sourceTitleId || item.id, id: item.id });
 const thumbSrc = item.coverImage || ANIME_PLACEHOLDER;
 ---
 
-<a href={targetHref} class="anime-card" data-type="anime" data-title={item.title.toLowerCase()} data-genres={item.genres.join(',').toLowerCase()}>
+<a href={targetHref} class="anime-card" data-type="anime" data-title={item.title.toLowerCase()} data-genres={item.genres ? item.genres.join(',').toLowerCase() : ''}>
   <div class="card-thumb-container">
     <img
       src={thumbSrc}

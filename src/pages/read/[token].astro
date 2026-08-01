@@ -1,0 +1,63 @@
+---
+import MainLayout from '../../layouts/MainLayout.astro';
+import MangaReader from '../../components/reader/MangaReader.astro';
+import { ApiService } from '../../db/apiService';
+import { decodePrivacySlug } from '../../utils/privacy';
+
+const token = Astro.params.token || '';
+const { sourceId, titleId, contentId } = decodePrivacySlug(token);
+
+let liveTitleDetails = await ApiService.getTitleDetails(sourceId, titleId);
+let actualSourceTitleId = titleId;
+
+if (!liveTitleDetails) {
+  const catalog = await ApiService.browseSource(sourceId);
+  const match = catalog.items.find(item => {
+    const safe = (item.sourceTitleId || 'title').replace(/[\/\s]/g, '-').toLowerCase();
+    return safe === titleId || item.sourceTitleId === titleId || safe.includes(titleId) || titleId.includes(safe);
+  });
+  if (match) {
+    actualSourceTitleId = match.sourceTitleId;
+    liveTitleDetails = await ApiService.getTitleDetails(sourceId, match.sourceTitleId);
+  }
+}
+
+let realPagesData: any = null;
+const chNumStr = contentId
+  ? (contentId.includes('-ch-') ? contentId.split('-ch-').pop() : (contentId.includes('ch-') ? contentId.split('ch-').pop() : contentId))
+  : '1';
+
+const candidates = [
+  contentId,
+  chNumStr,
+  chNumStr ? `ch-${chNumStr}` : undefined,
+  chNumStr ? `chapter-${chNumStr}` : undefined,
+  undefined
+].filter(Boolean);
+
+for (const cand of candidates) {
+  const res = await ApiService.getReaderPages(sourceId, actualSourceTitleId, cand as string);
+  if (res && res.pages && res.pages.length > 0) {
+    realPagesData = res;
+    break;
+  }
+}
+
+const title = liveTitleDetails?.title || 'Manga Content';
+const pageUrls = realPagesData && realPagesData.pages.length > 0
+  ? realPagesData.pages.map((p: any) => p.imageUrl)
+  : [];
+
+const currentChNum = parseInt(chNumStr || '1') || 1;
+---
+
+<MainLayout title={`Sirochan — Reader (Protected)`} hideNav={true}>
+  <MangaReader
+    mangaTitle={title}
+    chapterTitle={`Chapter ${currentChNum}`}
+    chapterNumber={currentChNum}
+    totalPages={pageUrls.length}
+    pages={pageUrls}
+    mangaId={actualSourceTitleId}
+  />
+</MainLayout>

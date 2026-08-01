@@ -62,6 +62,7 @@ export interface MediaSource {
 
 export interface MediaItem {
   id: string;
+  sourceTitleId?: string;
   title: string;
   japaneseTitle?: string;
   type: MediaType;

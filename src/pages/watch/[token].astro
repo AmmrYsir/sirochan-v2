@@ -1,0 +1,46 @@
+---
+import MainLayout from '../../layouts/MainLayout.astro';
+import AnimePlayer from '../../components/player/AnimePlayer.astro';
+import { ApiService } from '../../db/apiService';
+import { decodePrivacySlug } from '../../utils/privacy';
+import { ANIME_PLACEHOLDER } from '../../utils/placeholders';
+
+const token = Astro.params.token || '';
+const { sourceId, titleId, contentId } = decodePrivacySlug(token);
+
+let liveTitleDetails = await ApiService.getTitleDetails(sourceId, titleId);
+let actualSourceTitleId = titleId;
+
+if (!liveTitleDetails) {
+  const catalog = await ApiService.browseSource(sourceId);
+  const match = catalog.items.find(item => {
+    const safe = (item.sourceTitleId || 'title').replace(/[\/\s]/g, '-').toLowerCase();
+    return safe === titleId || item.sourceTitleId === titleId || safe.includes(titleId) || titleId.includes(safe);
+  });
+  if (match) {
+    actualSourceTitleId = match.sourceTitleId;
+    liveTitleDetails = await ApiService.getTitleDetails(sourceId, match.sourceTitleId);
+  }
+}
+
+// Fetch video stream details
+const videoPlaybackData = await ApiService.getPlaybackStream(sourceId, actualSourceTitleId, contentId);
+
+const title = videoPlaybackData?.title || liveTitleDetails?.title || 'Video Stream';
+const streamUrl = videoPlaybackData?.streamUrl || '';
+const posterUrl = videoPlaybackData?.posterUrl || liveTitleDetails?.thumbnailUrl || ANIME_PLACEHOLDER;
+const epNumStr = contentId ? (contentId.includes('ep-') ? contentId.split('ep-')[1] : contentId) : '1';
+const episodeNumber = parseInt(epNumStr || '1') || 1;
+---
+
+<MainLayout title={`Sirochan — Player (Protected)`} hideNav={true}>
+  <AnimePlayer
+    animeTitle={title}
+    episodeNumber={episodeNumber}
+    episodeTitle="Full Stream HD"
+    videoUrl={streamUrl}
+    posterUrl={posterUrl}
+    animeId={actualSourceTitleId}
+    episodes={[{ id: contentId || 'ep-1', number: episodeNumber, title: title, duration: 'HD Stream' }]}
+  />
+</MainLayout>

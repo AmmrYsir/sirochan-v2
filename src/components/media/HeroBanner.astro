@@ -2,6 +2,7 @@
 import Button from '../common/Button.astro';
 import type { MediaItem } from '../../types';
 import { ANIME_PLACEHOLDER } from '../../utils/placeholders';
+import { getPrivacyTitleUrl, getPrivacyReaderUrl, getPrivacyPlayerUrl } from '../../utils/privacy';
 
 interface Props {
   item: MediaItem;
@@ -9,6 +10,10 @@ interface Props {
 
 const { item } = Astro.props;
 const bannerSrc = item.bannerImage || ANIME_PLACEHOLDER;
+const detailsUrl = getPrivacyTitleUrl({ sourceId: item.sourceId, sourceTitleId: item.sourceTitleId || item.id, id: item.id });
+const readUrl = item.type === 'anime'
+  ? getPrivacyPlayerUrl({ sourceId: item.sourceId, sourceTitleId: item.sourceTitleId || item.id, id: item.id }, 'ep-1')
+  : getPrivacyReaderUrl({ sourceId: item.sourceId, sourceTitleId: item.sourceTitleId || item.id, id: item.id }, 'ch-1');
 ---
 
 <section class="hero-banner">
@@ -28,10 +33,10 @@ const bannerSrc = item.bannerImage || ANIME_PLACEHOLDER;
       <p class="hero-desc">{item.description}</p>
       
       <div class="hero-actions">
-        <Button href={`/${item.sourceId || 'mangadex'}/${item.id}/${item.id}-ch-1`} variant="primary" size="md">
-          READ NOW
+        <Button href={readUrl} variant="primary" size="md">
+          {item.type === 'anime' ? 'WATCH NOW' : 'READ NOW'}
         </Button>
-        <Button href={`/${item.sourceId || 'mangadex'}/${item.id}`} variant="secondary" size="md">
+        <Button href={detailsUrl} variant="secondary" size="md">
           DETAILS
         </Button>
       </div>

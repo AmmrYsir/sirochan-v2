@@ -1,6 +1,7 @@
 ---
 import type { MediaItem } from '../../types';
 import { MANGA_PLACEHOLDER } from '../../utils/placeholders';
+import { getPrivacyTitleUrl } from '../../utils/privacy';
 
 interface Props {
   item: MediaItem;
@@ -9,9 +10,10 @@ interface Props {
 const { item } = Astro.props;
 const coverSrc = item.coverImage || MANGA_PLACEHOLDER;
 const categoryTag = item.genres && item.genres[0] ? item.genres[0].toUpperCase() : (item.type === 'anime' ? 'ANIME' : 'MANGA');
+const privacyUrl = getPrivacyTitleUrl({ sourceId: item.sourceId, sourceTitleId: item.sourceTitleId || item.id, id: item.id });
 ---
 
-<a href={`/${item.sourceId || 'mangadex'}/${item.id}`} class="editorial-card">
+<a href={privacyUrl} class="editorial-card">
   <div class="editorial-thumb-wrapper">
     <img
       src={coverSrc}

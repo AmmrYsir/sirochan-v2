@@ -1,17 +1,18 @@
 ---
 import type { MediaItem } from '../../types';
 import { MANGA_PLACEHOLDER } from '../../utils/placeholders';
+import { getPrivacyTitleUrl } from '../../utils/privacy';
 
 interface Props {
   item: MediaItem;
 }
 
 const { item } = Astro.props;
-const targetHref = `/${item.sourceId || 'mangadex'}/${item.id}`;
+const targetHref = getPrivacyTitleUrl({ sourceId: item.sourceId, sourceTitleId: item.sourceTitleId || item.id, id: item.id });
 const coverSrc = item.coverImage || MANGA_PLACEHOLDER;
 ---
 
-<a href={targetHref} class="manga-card" data-type="manga" data-title={item.title.toLowerCase()} data-genres={item.genres.join(',').toLowerCase()}>
+<a href={targetHref} class="manga-card" data-type="manga" data-title={item.title.toLowerCase()} data-genres={item.genres ? item.genres.join(',').toLowerCase() : ''}>
   <div class="card-cover-container">
     <img
       src={coverSrc}

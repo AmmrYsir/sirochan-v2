@@ -1,0 +1,593 @@
+---
+import MainLayout from '../../layouts/MainLayout.astro';
+import Button from '../../components/common/Button.astro';
+import Badge from '../../components/common/Badge.astro';
+import { ApiService } from '../../db/apiService';
+import { db } from '../../db/client';
+import { bookmarks } from '../../db/schema';
+import { eq, and } from 'drizzle-orm';
+import { MANGA_PLACEHOLDER, ANIME_PLACEHOLDER } from '../../utils/placeholders';
+import { decodePrivacySlug, getPrivacyReaderUrl, getPrivacyPlayerUrl } from '../../utils/privacy';
+
+function formatHumanDate(dateStr?: string | null): string | null {
+  if (!dateStr || dateStr.trim() === '' || dateStr === 'JUST NOW' || dateStr === 'CLASSIC' || dateStr === '2026-07-30') return null;
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return null;
+
+  const now = new Date();
+  const diffMs = now.getTime() - d.getTime();
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  if (diffHours >= 0 && diffHours < 1) return 'Just now';
+  if (diffHours >= 1 && diffHours < 24) return `${diffHours}h ago`;
+  if (diffDays >= 1 && diffDays < 24) return `${diffDays}d ago`;
+  if (diffDays >= 7 && diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`;
+
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+const token = Astro.params.token || '';
+const { sourceId, titleId } = decodePrivacySlug(token);
+const user = Astro.locals.user;
+
+// Direct API call to microservice adapter
+let liveTitleDetails = await ApiService.getTitleDetails(sourceId, titleId);
+
+if (!liveTitleDetails) {
+  const catalog = await ApiService.browseSource(sourceId);
+  const match = catalog.items.find(item => {
+    const safe = (item.sourceTitleId || 'title').replace(/[\/\s]/g, '-').toLowerCase();
+    return safe === titleId || item.sourceTitleId === titleId || safe.includes(titleId) || titleId.includes(safe);
+  });
+  if (match) {
+    liveTitleDetails = await ApiService.getTitleDetails(sourceId, match.sourceTitleId);
+  }
+}
+
+const rawDesc = liveTitleDetails?.description
+  ? liveTitleDetails.description.replace(/<[^>]*>/g, '').replace(/&[a-z0-9#]+;/gi, '"')
+  : '';
+
+const rawDate = liveTitleDetails?.updatedAt || liveTitleDetails?.releasedAt || null;
+const humanDate = formatHumanDate(rawDate);
+
+const item = liveTitleDetails ? {
+  id: liveTitleDetails.sourceTitleId,
+  sourceId: sourceId,
+  title: liveTitleDetails.title,
+  japaneseTitle: liveTitleDetails.altTitles?.[0] || liveTitleDetails.title,
+  type: liveTitleDetails.mediaType || 'manga',
+  coverImage: liveTitleDetails.thumbnailUrl || 'https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=600&q=80',
+  bannerImage: liveTitleDetails.thumbnailUrl || 'https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=1600&q=80',
+  description: rawDesc || 'Live metadata title details.',
+  rating: liveTitleDetails.rating || 4.8,
+  status: (liveTitleDetails.status?.toUpperCase() || 'RELEASING') as any,
+  genres: liveTitleDetails.tags?.length > 0 ? liveTitleDetails.tags : ['Action', 'Fantasy'],
+  latestChapterOrEpisode: `CH. ${liveTitleDetails.totalChapters || 1}`,
+  humanDate: humanDate
+} : {
+  id: titleId || 'title',
+  sourceId: sourceId,
+  title: titleId?.replace(/-/g, ' ').toUpperCase() || 'TITLE',
+  japaneseTitle: '',
+  type: 'manga' as const,
+  coverImage: 'https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=600&q=80',
+  bannerImage: 'https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=1600&q=80',
+  description: 'Live title details.',
+  rating: 4.8,
+  status: 'RELEASING' as const,
+  genres: ['Manga'],
+  latestChapterOrEpisode: 'CH. 1',
+  humanDate: null
+};
+
+const mediaId = `${sourceId}:${item.id}`;
+let isBookmarked = false;
+
+if (user) {
+  try {
+    const existingBookmark = await db.query.bookmarks.findFirst({
+      where: and(
+        eq(bookmarks.userId, user.id),
+        eq(bookmarks.mediaId, mediaId)
+      )
+    });
+    if (existingBookmark) isBookmarked = true;
+  } catch (err) {
+    console.error('Error fetching user bookmark:', err);
+  }
+}
+
+const count = liveTitleDetails?.totalChapters || liveTitleDetails?.totalEpisodes || liveTitleDetails?.contentSummary?.totalCount || 1;
+const chapters = Array.from({ length: count }, (_, i) => {
+  const chId = `${item.id}-ch-${count - i}`;
+  const privacyUrl = item.type === 'anime' 
+    ? getPrivacyPlayerUrl({ sourceId: item.sourceId, id: item.id }, chId)
+    : getPrivacyReaderUrl({ sourceId: item.sourceId, id: item.id }, chId);
+
+  return {
+    id: chId,
+    mediaId: item.id,
+    chapterNumber: count - i,
+    title: item.title,
+    humanDate: item.humanDate,
+    privacyUrl
+  };
+});
+
+const firstChapterUrl = chapters[0]?.privacyUrl || '#';
+---
+
+<MainLayout title={`Sirochan — Media Details`}>
+  <div class="manga-detail-page">
+    <!-- Banner Header -->
+    <div class="detail-banner-wrapper">
+      <img
+        src={item.bannerImage || ANIME_PLACEHOLDER}
+        alt="Media Banner"
+        class="detail-banner"
+        onerror={`this.onerror=null; this.src='${ANIME_PLACEHOLDER}';`}
+      />
+      <div class="banner-overlay"></div>
+    </div>
+
+    <div class="detail-content container-constrained">
+      <div class="detail-grid">
+        <!-- Cover & Actions -->
+        <div class="cover-column">
+          <img
+            src={item.coverImage || MANGA_PLACEHOLDER}
+            alt="Cover"
+            class="main-cover"
+            onerror={`this.onerror=null; this.src='${MANGA_PLACEHOLDER}';`}
+          />
+          <Button
+            href={firstChapterUrl}
+            variant="primary"
+            size="lg"
+            class="read-btn"
+          >
+            {item.type === 'anime' ? 'STREAM EPISODE 1' : 'READ FIRST CH.'}
+          </Button>
+
+          <!-- Interactive Bookmark Button -->
+          <button 
+            id="bookmark-btn" 
+            class={`bookmark-action-btn ${isBookmarked ? 'bookmarked' : ''}`}
+            data-media-id={mediaId}
+            data-source-id={sourceId}
+            data-title={item.title}
+            data-type={item.type}
+            data-bookmarked={isBookmarked ? 'true' : 'false'}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill={isBookmarked ? 'currentColor' : 'none'} stroke="currentColor" stroke-width="2">
+              <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
+            </svg>
+            <span id="bookmark-btn-text">{isBookmarked ? 'IN LIBRARY' : 'ADD TO BOOKMARKS'}</span>
+          </button>
+        </div>
+
+        <!-- Meta & Overview -->
+        <div class="info-column">
+          <div class="meta-badges">
+            <Badge variant="red" class="status-badge">{item.status}</Badge>
+            <Badge variant="orange" class="source-badge">PROTECTED VIEW</Badge>
+          </div>
+
+          <h1 class="manga-title">{item.title}</h1>
+          <p class="jp-title">{item.japaneseTitle}</p>
+
+          <div class="meta-row">
+            <span class="rating-badge">★ {item.rating}</span>
+            <span class="meta-dot">•</span>
+            <span class="meta-mono">{chapters.length} {item.type === 'anime' ? 'EPISODES' : 'CHAPTERS'}</span>
+            {item.humanDate && (
+              <>
+                <span class="meta-dot">•</span>
+                <span class="meta-date">{item.humanDate}</span>
+              </>
+            )}
+          </div>
+
+          <div class="genre-tags">
+            {item.genres.map((g) => (
+              <span class="genre-pill">{g}</span>
+            ))}
+          </div>
+
+          <p class="description">{item.description}</p>
+        </div>
+      </div>
+
+      <!-- Chapter / Episode List -->
+      <section class="chapters-section">
+        <div class="chapters-header-row">
+          <h2 class="section-title">{item.type === 'anime' ? 'EPISODE LIST' : 'CHAPTER LIST'} ({chapters.length})</h2>
+          <div class="sort-segmented-control">
+            <span class="sort-icon-label">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="6" y1="12" x2="18" y2="12"/><line x1="9" y1="18" x2="15" y2="18"/></svg>
+              SORT
+            </span>
+            <div class="sort-pills-wrapper">
+              <button class="sort-pill active" data-sort="latest">
+                <span>Latest</span>
+              </button>
+              <button class="sort-pill" data-sort="oldest">
+                <span>Oldest</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div class="chapters-stack" id="chapters-container">
+          {chapters.map((ch) => (
+            <a href={ch.privacyUrl} class="chapter-row" data-num={ch.chapterNumber}>
+              <div class="ch-left">
+                <span class="ch-num">{item.type === 'anime' ? 'EP.' : 'CH.'} {ch.chapterNumber}</span>
+                <span class="ch-title">{ch.title}</span>
+              </div>
+              {ch.humanDate ? <span class="ch-date">{ch.humanDate}</span> : null}
+            </a>
+          ))}
+        </div>
+      </section>
+    </div>
+  </div>
+</MainLayout>
+
+<script>
+  const sortBtns = document.querySelectorAll('.sort-pill');
+  const container = document.getElementById('chapters-container');
+  const bookmarkBtn = document.getElementById('bookmark-btn');
+  const bookmarkText = document.getElementById('bookmark-btn-text');
+
+  if (bookmarkBtn) {
+    bookmarkBtn.addEventListener('click', async () => {
+      const isBookmarked = bookmarkBtn.getAttribute('data-bookmarked') === 'true';
+      const mediaId = bookmarkBtn.getAttribute('data-media-id');
+      const sourceId = bookmarkBtn.getAttribute('data-source-id');
+      const title = bookmarkBtn.getAttribute('data-title');
+      const type = bookmarkBtn.getAttribute('data-type');
+
+      try {
+        const res = await fetch('/api/library/bookmark', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            mediaId,
+            sourceId,
+            title,
+            type,
+            action: isBookmarked ? 'remove' : 'add'
+          })
+        });
+
+        if (res.status === 401) {
+          window.location.href = '/login';
+          return;
+        }
+
+        const data = await res.json();
+        if (data.success) {
+          const nextState = !isBookmarked;
+          bookmarkBtn.setAttribute('data-bookmarked', nextState ? 'true' : 'false');
+          if (nextState) {
+            bookmarkBtn.classList.add('bookmarked');
+            if (bookmarkText) bookmarkText.textContent = 'IN LIBRARY';
+            bookmarkBtn.querySelector('svg')?.setAttribute('fill', 'currentColor');
+          } else {
+            bookmarkBtn.classList.remove('bookmarked');
+            if (bookmarkText) bookmarkText.textContent = 'ADD TO BOOKMARKS';
+            bookmarkBtn.querySelector('svg')?.setAttribute('fill', 'none');
+          }
+        }
+      } catch (err) {
+        console.error('Error toggling bookmark:', err);
+      }
+    });
+  }
+
+  if (container) {
+    sortBtns.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const sort = btn.getAttribute('data-sort');
+        sortBtns.forEach((b) => b.classList.remove('active'));
+        btn.classList.add('active');
+
+        const rows = Array.from(container.children) as HTMLElement[];
+        rows.sort((a, b) => {
+          const numA = parseInt(a.getAttribute('data-num') || '0');
+          const numB = parseInt(b.getAttribute('data-num') || '0');
+          return sort === 'latest' ? numB - numA : numA - numB;
+        });
+
+        rows.forEach((row) => container.appendChild(row));
+      });
+    });
+  }
+</script>
+
+<style>
+  .detail-banner-wrapper {
+    position: relative;
+    width: 100%;
+    height: 260px;
+    overflow: hidden;
+  }
+
+  .detail-banner {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .banner-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, rgba(0, 0, 0, 0.3) 0%, var(--bg-deep) 100%);
+  }
+
+  .detail-content {
+    margin-top: -80px;
+    position: relative;
+    z-index: 10;
+    display: flex;
+    flex-direction: column;
+    gap: 40px;
+  }
+
+  .detail-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+
+  @media (min-width: 640px) {
+    .detail-grid {
+      grid-template-columns: 240px 1fr;
+    }
+  }
+
+  .cover-column {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .main-cover {
+    width: 100%;
+    aspect-ratio: 3 / 4;
+    border-radius: var(--radius-md);
+    object-fit: cover;
+    border: 1px solid var(--border-subtle);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+  }
+
+  .read-btn {
+    width: 100%;
+  }
+
+  .bookmark-action-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+    padding: 12px;
+    background-color: var(--bg-surface, #121212);
+    border: 1px solid var(--border-subtle, #2A2A2A);
+    border-radius: var(--radius-md, 12px);
+    color: var(--text-primary, #ffffff);
+    font-family: var(--font-mono, monospace);
+    font-size: 0.78rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .bookmark-action-btn:hover {
+    border-color: #E63946;
+    color: #E63946;
+    background-color: var(--bg-elevated, #1E1E1E);
+  }
+
+  .bookmark-action-btn.bookmarked {
+    border-color: rgba(230, 57, 70, 0.5);
+    background-color: rgba(230, 57, 70, 0.12);
+    color: #E63946;
+  }
+
+  .info-column {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .meta-badges {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .manga-title {
+    font-family: var(--font-hero);
+    font-size: 2.2rem;
+    font-weight: 800;
+    line-height: 1.1;
+  }
+
+  .jp-title {
+    font-size: 0.95rem;
+    color: var(--text-muted);
+  }
+
+  .meta-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 4px;
+  }
+
+  .rating-badge {
+    font-family: var(--font-mono);
+    font-weight: 700;
+    color: var(--accent-orange);
+    font-size: 0.9rem;
+  }
+
+  .meta-dot {
+    color: var(--text-dim);
+  }
+
+  .meta-mono, .meta-date {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    color: var(--text-muted);
+  }
+
+  .genre-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .genre-pill {
+    padding: 4px 10px;
+    border-radius: var(--radius-full);
+    background-color: var(--bg-elevated);
+    border: 1px solid var(--border-subtle);
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+  }
+
+  .description {
+    font-size: 0.95rem;
+    line-height: 1.6;
+    color: var(--text-secondary);
+    margin-top: 8px;
+  }
+
+  .chapters-section {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .chapters-header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border-subtle);
+    padding-bottom: 10px;
+  }
+
+  .sort-segmented-control {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background-color: rgba(22, 22, 26, 0.75);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-full);
+    padding: 3px 4px 3px 12px;
+  }
+
+  .sort-icon-label {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: var(--text-muted);
+    text-transform: uppercase;
+  }
+
+  .sort-pills-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    background-color: var(--bg-surface);
+    border-radius: var(--radius-full);
+    padding: 2px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  .sort-pill {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-family: var(--font-body);
+    font-size: 0.76rem;
+    font-weight: 600;
+    padding: 4px 12px;
+    border-radius: var(--radius-full);
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .sort-pill:hover {
+    color: #ffffff;
+    background-color: rgba(255, 255, 255, 0.06);
+  }
+
+  .sort-pill.active {
+    background-color: var(--accent-red);
+    color: #ffffff;
+    box-shadow: 0 2px 8px rgba(230, 57, 70, 0.4);
+  }
+
+  .chapters-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .chapter-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    background-color: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    text-decoration: none;
+    transition: all 0.2s ease;
+  }
+
+  .chapter-row:hover {
+    border-color: var(--text-muted);
+    background-color: var(--bg-elevated);
+  }
+
+  .ch-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .ch-num {
+    font-family: var(--font-mono);
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--accent-red);
+  }
+
+  .ch-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .ch-date {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--text-muted);
+  }
+</style>

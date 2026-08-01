@@ -7,6 +7,7 @@ import EditorialItem from '../components/media/EditorialItem.astro';
 import Badge from '../components/common/Badge.astro';
 import { currentUser } from '../db/mockData';
 import { ApiService } from '../db/apiService';
+import { getPrivacyTitleUrl } from '../utils/privacy';
 
 // Fetch live sources & browse catalog
 let heroItem: any;
@@ -141,7 +142,7 @@ try {
 
         {trendingSpotlight && (
           <div class="trending-spotlight">
-            <a href={`/${trendingSpotlight.sourceId || 'mangadex'}/${trendingSpotlight.id}`} class="spotlight-banner-card">
+            <a href={getPrivacyTitleUrl({ sourceId: trendingSpotlight.sourceId, sourceTitleId: trendingSpotlight.sourceTitleId || trendingSpotlight.id, id: trendingSpotlight.id })} class="spotlight-banner-card">
               <div class="spotlight-cover-col">
                 <img src={trendingSpotlight.coverImage} alt={trendingSpotlight.title} class="spotlight-cover-img" />
                 <span class="spotlight-type-badge">{trendingSpotlight.type.toUpperCase()}</span>

@@ -3,53 +3,168 @@ import MainLayout from '../layouts/MainLayout.astro';
 import MangaCard from '../components/media/MangaCard.astro';
 import AnimeCard from '../components/media/AnimeCard.astro';
 import { ApiService } from '../db/apiService';
+import { db } from '../db/client';
+import { bookmarks, userProgress } from '../db/schema';
+import { eq, desc } from 'drizzle-orm';
 
-const sources = await ApiService.getSources();
-const browseResults = await Promise.all(
-  sources.map(src => ApiService.browseSource(src.id))
-);
+const user = Astro.locals.user;
 
-const allItems = browseResults.flatMap((res, idx) => {
-  const srcId = sources[idx]?.id || 'mangadex';
-  return res.items.map(item => ({
-    ...item,
-    sourceId: srcId
-  }));
-});
+let bookmarkedMedia: any[] = [];
+let continueMedia: any[] = [];
 
-const mediaList = allItems.map(item => {
-  const isAnime = item.mediaType === 'anime';
-  return {
-    id: item.sourceTitleId,
-    sourceId: item.sourceId,
-    sourceTitleId: item.sourceTitleId,
-    title: item.title,
-    type: item.mediaType,
-    coverImage: item.thumbnailUrl || (isAnime 
-      ? 'https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=600&q=80'
-      : 'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?auto=format&fit=crop&w=600&q=80'),
-    bannerImage: item.thumbnailUrl || 'https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=1600&q=80',
-    description: item.description || 'Saved library title.',
-    rating: item.rating || 4.8,
-    status: 'RELEASING' as const,
-    genres: item.genres && item.genres.length > 0 ? item.genres : [isAnime ? 'Anime' : 'Manga'],
-    latestChapterOrEpisode: isAnime ? `EP. ${item.totalEpisodes || 12}` : `CH. ${item.totalChapters || 100}`,
-    updatedAgo: 'SAVED',
-    progressPercent: Math.floor(Math.random() * 40) + 40
-  };
-});
+if (user) {
+  try {
+    // 1. Fetch real DB bookmarks for user
+    const dbBookmarks = await db.query.bookmarks.findMany({
+      where: eq(bookmarks.userId, user.id),
+      orderBy: [desc(bookmarks.createdAt)]
+    });
 
-const continueMedia = mediaList.slice(0, 6);
-const bookmarkedMedia = mediaList.slice(6);
+    const bookmarkedMediaIds = dbBookmarks.map(b => b.mediaId);
+
+    // 2. Fetch real DB progress for user
+    const dbProgress = await db.query.userProgress.findMany({
+      where: eq(userProgress.userId, user.id),
+      orderBy: [desc(userProgress.lastReadOrWatchedAt)]
+    });
+
+    const progressMediaIds = dbProgress.map(p => p.mediaId);
+    const allRelevantIds = Array.from(new Set([...bookmarkedMediaIds, ...progressMediaIds]));
+
+    // Fetch cached media entries from DB
+    const mediaEntries = allRelevantIds.length > 0
+      ? await db.query.media.findMany({
+          where: (table, { inArray }) => inArray(table.id, allRelevantIds)
+        })
+      : [];
+
+    const mediaMap = new Map(mediaEntries.map(m => [m.id, m]));
+
+    // Map real bookmarked items
+    bookmarkedMedia = await Promise.all(dbBookmarks.map(async b => {
+      const cached = mediaMap.get(b.mediaId);
+      const [srcId, titleId] = b.mediaId.split(':');
+
+      let liveDetails: any = null;
+      if (srcId && titleId) {
+        liveDetails = await ApiService.getTitleDetails(srcId, titleId);
+      }
+
+      const title = liveDetails?.title || cached?.title || titleId || 'Saved Media';
+      const isAnime = (liveDetails?.mediaType || cached?.type) === 'anime';
+
+      return {
+        id: titleId || b.mediaId,
+        sourceId: srcId || 'mangadex',
+        sourceTitleId: titleId || b.mediaId,
+        title,
+        type: isAnime ? 'anime' : 'manga',
+        coverImage: liveDetails?.thumbnailUrl || cached?.coverImage || (isAnime 
+          ? 'https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=600&q=80'
+          : 'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?auto=format&fit=crop&w=600&q=80'),
+        bannerImage: liveDetails?.thumbnailUrl || cached?.bannerImage,
+        description: liveDetails?.description || cached?.description || 'Bookmarked in library.',
+        rating: liveDetails?.rating || 4.9,
+        status: 'RELEASING' as const,
+        genres: liveDetails?.tags || cached?.genres || [isAnime ? 'Anime' : 'Manga'],
+        latestChapterOrEpisode: isAnime ? `EP. ${liveDetails?.totalEpisodes || 12}` : `CH. ${liveDetails?.totalChapters || 100}`,
+        updatedAgo: 'BOOKMARKED'
+      };
+    }));
+
+    // Map real continue progress items
+    continueMedia = await Promise.all(dbProgress.map(async p => {
+      const cached = mediaMap.get(p.mediaId);
+      const [srcId, titleId] = p.mediaId.split(':');
+
+      let liveDetails: any = null;
+      if (srcId && titleId) {
+        liveDetails = await ApiService.getTitleDetails(srcId, titleId);
+      }
+
+      const title = liveDetails?.title || cached?.title || titleId || 'In Progress';
+      const isAnime = p.contentType === 'episode' || (liveDetails?.mediaType || cached?.type) === 'anime';
+
+      return {
+        id: titleId || p.mediaId,
+        sourceId: srcId || 'mangadex',
+        sourceTitleId: titleId || p.mediaId,
+        title,
+        type: isAnime ? 'anime' : 'manga',
+        coverImage: liveDetails?.thumbnailUrl || cached?.coverImage || (isAnime 
+          ? 'https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=600&q=80'
+          : 'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?auto=format&fit=crop&w=600&q=80'),
+        bannerImage: liveDetails?.thumbnailUrl || cached?.bannerImage,
+        description: liveDetails?.description || 'In progress media.',
+        rating: liveDetails?.rating || 4.9,
+        status: 'RELEASING' as const,
+        genres: liveDetails?.tags || cached?.genres || [isAnime ? 'Anime' : 'Manga'],
+        latestChapterOrEpisode: isAnime ? `EP. ${p.contentNumber}` : `CH. ${p.contentNumber}`,
+        updatedAgo: 'PROGRESS',
+        progressPercent: p.progressPercent || 50
+      };
+    }));
+
+  } catch (err) {
+    console.error('[Library] Error fetching user bookmarks from DB:', err);
+  }
+}
+
+// Fallback if no user or empty DB bookmarks
+if (bookmarkedMedia.length === 0 && continueMedia.length === 0) {
+  try {
+    const sources = await ApiService.getSources();
+    const browseResults = await Promise.all(
+      sources.slice(0, 3).map(src => ApiService.browseSource(src.id))
+    );
+
+    const allItems = browseResults.flatMap((res, idx) => {
+      const srcId = sources[idx]?.id || 'mangadex';
+      return res.items.map(item => ({
+        ...item,
+        sourceId: srcId
+      }));
+    });
+
+    const fallbackList = allItems.map(item => {
+      const isAnime = item.mediaType === 'anime';
+      return {
+        id: item.sourceTitleId,
+        sourceId: item.sourceId,
+        sourceTitleId: item.sourceTitleId,
+        title: item.title,
+        type: item.mediaType,
+        coverImage: item.thumbnailUrl || (isAnime 
+          ? 'https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=600&q=80'
+          : 'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?auto=format&fit=crop&w=600&q=80'),
+        bannerImage: item.thumbnailUrl,
+        description: item.description || 'Discovered library title.',
+        rating: item.rating || 4.8,
+        status: 'RELEASING' as const,
+        genres: item.genres && item.genres.length > 0 ? item.genres : [isAnime ? 'Anime' : 'Manga'],
+        latestChapterOrEpisode: isAnime ? `EP. ${item.totalEpisodes || 12}` : `CH. ${item.totalChapters || 100}`,
+        updatedAgo: 'DISCOVER'
+      };
+    });
+
+    continueMedia = fallbackList.slice(0, 4);
+    bookmarkedMedia = fallbackList.slice(4, 10);
+  } catch (err) {
+    console.error('[Library] Error fetching fallback media:', err);
+  }
+}
 ---
 
 <MainLayout title="My Library - Sirochan" activeTab="library">
   <div class="library-page container-constrained">
     <div class="library-header">
-      <h1 class="page-title">MY LIBRARY</h1>
+      <div class="header-title-row">
+        <h1 class="page-title">MY LIBRARY</h1>
+        <span class="privacy-badge">🔒 PRIVACY PROTECTED</span>
+      </div>
       
       <div class="lib-tabs">
-        <button class="lib-tab active" data-tab="all">All Titles ({mediaList.length})</button>
+        <button class="lib-tab active" data-tab="all">All Titles ({continueMedia.length + bookmarkedMedia.length})</button>
         <button class="lib-tab" data-tab="in-progress">In Progress ({continueMedia.length})</button>
         <button class="lib-tab" data-tab="bookmarks">Bookmarked ({bookmarkedMedia.length})</button>
         <button class="lib-tab" data-tab="favorites">Favorites</button>
@@ -62,15 +177,23 @@ const bookmarkedMedia = mediaList.slice(6);
         <h2 class="section-subtitle">CONTINUE READING & WATCHING</h2>
         <span class="count-tag">{continueMedia.length} Active</span>
       </div>
-      <div class="responsive-media-grid">
-        {continueMedia.map(item => (
-          item.type === 'manga' ? (
-            <MangaCard item={item} />
-          ) : (
-            <AnimeCard item={item} />
-          )
-        ))}
-      </div>
+      
+      {continueMedia.length > 0 ? (
+        <div class="responsive-media-grid">
+          {continueMedia.map(item => (
+            item.type === 'manga' ? (
+              <MangaCard item={item} />
+            ) : (
+              <AnimeCard item={item} />
+            )
+          ))}
+        </div>
+      ) : (
+        <div class="empty-state-box">
+          <p>No active progress records yet. Start reading manga or streaming anime from Discover.</p>
+          <a href="/discover" class="btn-primary">BROWSE DISCOVER →</a>
+        </div>
+      )}
     </section>
 
     <!-- Bookmarks Section -->
@@ -79,15 +202,23 @@ const bookmarkedMedia = mediaList.slice(6);
         <h2 class="section-subtitle">BOOKMARKED TITLES</h2>
         <span class="count-tag">{bookmarkedMedia.length} Saved</span>
       </div>
-      <div class="responsive-media-grid">
-        {bookmarkedMedia.map(item => (
-          item.type === 'manga' ? (
-            <MangaCard item={item} />
-          ) : (
-            <AnimeCard item={item} />
-          )
-        ))}
-      </div>
+
+      {bookmarkedMedia.length > 0 ? (
+        <div class="responsive-media-grid">
+          {bookmarkedMedia.map(item => (
+            item.type === 'manga' ? (
+              <MangaCard item={item} />
+            ) : (
+              <AnimeCard item={item} />
+            )
+          ))}
+        </div>
+      ) : (
+        <div class="empty-state-box">
+          <p>Your library is empty. Click "ADD TO BOOKMARKS" on any manga or anime to save it here.</p>
+          <a href="/discover" class="btn-primary">EXPLORE SOURCES →</a>
+        </div>
+      )}
     </section>
   </div>
 </MainLayout>
@@ -127,12 +258,30 @@ const bookmarkedMedia = mediaList.slice(6);
     gap: 36px;
   }
 
+  .header-title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 12px;
+  }
+
   .page-title {
     font-family: var(--font-hero);
     font-size: 2rem;
     font-weight: 800;
-    margin-bottom: 16px;
     letter-spacing: -0.01em;
+  }
+
+  .privacy-badge {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 700;
+    color: #2ec4b6;
+    background-color: rgba(46, 196, 182, 0.12);
+    border: 1px solid #2ec4b6;
+    padding: 4px 10px;
+    border-radius: var(--radius-full);
   }
 
   .lib-tabs {
@@ -193,5 +342,33 @@ const bookmarkedMedia = mediaList.slice(6);
     border: 1px solid var(--border-subtle);
     padding: 2px 8px;
     border-radius: var(--radius-sm);
+  }
+
+  .empty-state-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    padding: 40px 20px;
+    background-color: var(--bg-surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    text-align: center;
+  }
+
+  .empty-state-box p {
+    font-size: 0.92rem;
+    color: var(--text-muted);
+    max-width: 440px;
+  }
+
+  .btn-primary {
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--accent-red);
+    text-decoration: none;
+    letter-spacing: 0.03em;
   }
 </style>
