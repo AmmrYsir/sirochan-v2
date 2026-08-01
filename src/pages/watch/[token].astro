@@ -2,6 +2,9 @@
 import MainLayout from '../../layouts/MainLayout.astro';
 import AnimePlayer from '../../components/player/AnimePlayer.astro';
 import { ApiService } from '../../db/apiService';
+import { db } from '../../db/client';
+import { media } from '../../db/schema';
+import { eq } from 'drizzle-orm';
 import { decodePrivacySlug } from '../../utils/privacy';
 import { ANIME_PLACEHOLDER } from '../../utils/placeholders';
 
@@ -23,12 +26,16 @@ if (!liveTitleDetails) {
   }
 }
 
+const dbMedia = await db.query.media.findFirst({
+  where: eq(media.id, `${sourceId}:${actualSourceTitleId}`)
+});
+
 // Fetch video stream details
 const videoPlaybackData = await ApiService.getPlaybackStream(sourceId, actualSourceTitleId, contentId);
 
-const title = videoPlaybackData?.title || liveTitleDetails?.title || 'Video Stream';
+const title = videoPlaybackData?.title || liveTitleDetails?.title || dbMedia?.title || 'Video Stream';
 const streamUrl = videoPlaybackData?.streamUrl || '';
-const posterUrl = videoPlaybackData?.posterUrl || liveTitleDetails?.thumbnailUrl || ANIME_PLACEHOLDER;
+const posterUrl = videoPlaybackData?.posterUrl || liveTitleDetails?.thumbnailUrl || dbMedia?.coverImage || ANIME_PLACEHOLDER;
 const epNumStr = contentId ? (contentId.includes('ep-') ? contentId.split('ep-')[1] : contentId) : '1';
 const episodeNumber = parseInt(epNumStr || '1') || 1;
 ---

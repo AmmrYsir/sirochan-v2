@@ -18,7 +18,16 @@ export const POST: APIRoute = async ({ request, locals }) => {
       sourceId,
       sourceTitleId,
       title,
+      japaneseTitle,
       type,
+      coverImage,
+      bannerImage,
+      description,
+      rating,
+      status,
+      genres,
+      totalChapters,
+      totalEpisodes,
       folder = 'bookmarks',
       action = 'add' // 'add' | 'remove'
     } = body;
@@ -40,23 +49,42 @@ export const POST: APIRoute = async ({ request, locals }) => {
       return new Response(JSON.stringify({ success: true, isBookmarked: false }), { status: 200 });
     }
 
-    // Ensure media entry exists
-    const existingMedia = await db.query.media.findFirst({
-      where: eq(media.id, mediaId)
-    });
-
-    if (!existingMedia && sourceId && title) {
+    // Upsert full media metadata into PostgreSQL
+    if (sourceId && title) {
       await db.insert(media).values({
         id: mediaId,
         sourceId,
         sourceTitleId: sourceTitleId || mediaId,
         title,
+        japaneseTitle: japaneseTitle || null,
         type: type || 'manga',
-        status: 'RELEASING'
-      }).onConflictDoNothing();
+        coverImage: coverImage || null,
+        bannerImage: bannerImage || null,
+        description: description || null,
+        rating: rating ? parseFloat(rating) : 4.8,
+        status: status || 'RELEASING',
+        genres: Array.isArray(genres) ? genres : [],
+        totalChapters: totalChapters ? parseInt(totalChapters) : null,
+        totalEpisodes: totalEpisodes ? parseInt(totalEpisodes) : null,
+        updatedAt: new Date()
+      }).onConflictDoUpdate({
+        target: media.id,
+        set: {
+          title,
+          japaneseTitle: japaneseTitle || null,
+          coverImage: coverImage || null,
+          bannerImage: bannerImage || null,
+          description: description || null,
+          rating: rating ? parseFloat(rating) : 4.8,
+          genres: Array.isArray(genres) ? genres : [],
+          totalChapters: totalChapters ? parseInt(totalChapters) : null,
+          totalEpisodes: totalEpisodes ? parseInt(totalEpisodes) : null,
+          updatedAt: new Date()
+        }
+      });
     }
 
-    // Upsert bookmark
+    // Upsert user bookmark
     await db.insert(bookmarks).values({
       userId: locals.user.id,
       mediaId,

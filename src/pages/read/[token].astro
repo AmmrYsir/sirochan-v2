@@ -2,6 +2,9 @@
 import MainLayout from '../../layouts/MainLayout.astro';
 import MangaReader from '../../components/reader/MangaReader.astro';
 import { ApiService } from '../../db/apiService';
+import { db } from '../../db/client';
+import { media } from '../../db/schema';
+import { eq } from 'drizzle-orm';
 import { decodePrivacySlug } from '../../utils/privacy';
 
 const token = Astro.params.token || '';
@@ -21,6 +24,10 @@ if (!liveTitleDetails) {
     liveTitleDetails = await ApiService.getTitleDetails(sourceId, match.sourceTitleId);
   }
 }
+
+const dbMedia = await db.query.media.findFirst({
+  where: eq(media.id, `${sourceId}:${actualSourceTitleId}`)
+});
 
 let realPagesData: any = null;
 const chNumStr = contentId
@@ -43,7 +50,7 @@ for (const cand of candidates) {
   }
 }
 
-const title = liveTitleDetails?.title || 'Manga Content';
+const title = liveTitleDetails?.title || dbMedia?.title || 'Manga Reader';
 const pageUrls = realPagesData && realPagesData.pages.length > 0
   ? realPagesData.pages.map((p: any) => p.imageUrl)
   : [];

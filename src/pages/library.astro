@@ -43,30 +43,31 @@ if (user) {
     // Map real bookmarked items
     bookmarkedMedia = await Promise.all(dbBookmarks.map(async b => {
       const cached = mediaMap.get(b.mediaId);
-      const [srcId, titleId] = b.mediaId.split(':');
+      const srcId = cached?.sourceId || (b.mediaId.includes(':') ? b.mediaId.split(':')[0] : 'mangadex');
+      const titleId = cached?.sourceTitleId || (b.mediaId.includes(':') ? b.mediaId.split(':')[1] : b.mediaId);
 
       let liveDetails: any = null;
       if (srcId && titleId) {
         liveDetails = await ApiService.getTitleDetails(srcId, titleId);
       }
 
-      const title = liveDetails?.title || cached?.title || titleId || 'Saved Media';
-      const isAnime = (liveDetails?.mediaType || cached?.type) === 'anime';
+      const title = cached?.title || liveDetails?.title || titleId || 'Saved Media';
+      const isAnime = (cached?.type || liveDetails?.mediaType) === 'anime';
 
       return {
-        id: titleId || b.mediaId,
-        sourceId: srcId || 'mangadex',
-        sourceTitleId: titleId || b.mediaId,
+        id: titleId,
+        sourceId: srcId,
+        sourceTitleId: titleId,
         title,
         type: isAnime ? 'anime' : 'manga',
-        coverImage: liveDetails?.thumbnailUrl || cached?.coverImage || (isAnime 
+        coverImage: cached?.coverImage || liveDetails?.thumbnailUrl || (isAnime 
           ? 'https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=600&q=80'
           : 'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?auto=format&fit=crop&w=600&q=80'),
-        bannerImage: liveDetails?.thumbnailUrl || cached?.bannerImage,
-        description: liveDetails?.description || cached?.description || 'Bookmarked in library.',
-        rating: liveDetails?.rating || 4.9,
+        bannerImage: cached?.bannerImage || liveDetails?.thumbnailUrl,
+        description: cached?.description || liveDetails?.description || 'Bookmarked in library.',
+        rating: cached?.rating || liveDetails?.rating || 4.9,
         status: 'RELEASING' as const,
-        genres: liveDetails?.tags || cached?.genres || [isAnime ? 'Anime' : 'Manga'],
+        genres: cached?.genres || liveDetails?.tags || [isAnime ? 'Anime' : 'Manga'],
         latestChapterOrEpisode: isAnime ? `EP. ${liveDetails?.totalEpisodes || 12}` : `CH. ${liveDetails?.totalChapters || 100}`,
         updatedAgo: 'BOOKMARKED'
       };
@@ -75,30 +76,31 @@ if (user) {
     // Map real continue progress items
     continueMedia = await Promise.all(dbProgress.map(async p => {
       const cached = mediaMap.get(p.mediaId);
-      const [srcId, titleId] = p.mediaId.split(':');
+      const srcId = cached?.sourceId || (p.mediaId.includes(':') ? p.mediaId.split(':')[0] : 'mangadex');
+      const titleId = cached?.sourceTitleId || (p.mediaId.includes(':') ? p.mediaId.split(':')[1] : p.mediaId);
 
       let liveDetails: any = null;
       if (srcId && titleId) {
         liveDetails = await ApiService.getTitleDetails(srcId, titleId);
       }
 
-      const title = liveDetails?.title || cached?.title || titleId || 'In Progress';
-      const isAnime = p.contentType === 'episode' || (liveDetails?.mediaType || cached?.type) === 'anime';
+      const title = cached?.title || liveDetails?.title || titleId || 'In Progress';
+      const isAnime = p.contentType === 'episode' || (cached?.type || liveDetails?.mediaType) === 'anime';
 
       return {
-        id: titleId || p.mediaId,
-        sourceId: srcId || 'mangadex',
-        sourceTitleId: titleId || p.mediaId,
+        id: titleId,
+        sourceId: srcId,
+        sourceTitleId: titleId,
         title,
         type: isAnime ? 'anime' : 'manga',
-        coverImage: liveDetails?.thumbnailUrl || cached?.coverImage || (isAnime 
+        coverImage: cached?.coverImage || liveDetails?.thumbnailUrl || (isAnime 
           ? 'https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=600&q=80'
           : 'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?auto=format&fit=crop&w=600&q=80'),
-        bannerImage: liveDetails?.thumbnailUrl || cached?.bannerImage,
-        description: liveDetails?.description || 'In progress media.',
-        rating: liveDetails?.rating || 4.9,
+        bannerImage: cached?.bannerImage || liveDetails?.thumbnailUrl,
+        description: cached?.description || liveDetails?.description || 'In progress media.',
+        rating: cached?.rating || liveDetails?.rating || 4.9,
         status: 'RELEASING' as const,
-        genres: liveDetails?.tags || cached?.genres || [isAnime ? 'Anime' : 'Manga'],
+        genres: cached?.genres || liveDetails?.tags || [isAnime ? 'Anime' : 'Manga'],
         latestChapterOrEpisode: isAnime ? `EP. ${p.contentNumber}` : `CH. ${p.contentNumber}`,
         updatedAgo: 'PROGRESS',
         progressPercent: p.progressPercent || 50

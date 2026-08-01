@@ -1,7 +1,6 @@
 import type { APIRoute } from 'astro';
 import { db } from '../../../db/client';
 import { userProgress, media } from '../../../db/schema';
-import { eq } from 'drizzle-orm';
 
 export const POST: APIRoute = async ({ request, locals }) => {
   if (!locals.user) {
@@ -18,7 +17,13 @@ export const POST: APIRoute = async ({ request, locals }) => {
       sourceId,
       sourceTitleId,
       title,
+      japaneseTitle,
       type, // 'manga' | 'anime'
+      coverImage,
+      bannerImage,
+      description,
+      rating,
+      genres,
       contentType, // 'chapter' | 'episode'
       contentId,
       contentNumber,
@@ -33,20 +38,33 @@ export const POST: APIRoute = async ({ request, locals }) => {
       });
     }
 
-    // Ensure media entry exists in DB cache
-    const existingMedia = await db.query.media.findFirst({
-      where: eq(media.id, mediaId)
-    });
-
-    if (!existingMedia && sourceId && title) {
+    // Upsert full media metadata into PostgreSQL
+    if (sourceId && title) {
       await db.insert(media).values({
         id: mediaId,
         sourceId,
         sourceTitleId: sourceTitleId || mediaId,
         title,
+        japaneseTitle: japaneseTitle || null,
         type: type || (contentType === 'chapter' ? 'manga' : 'anime'),
-        status: 'RELEASING'
-      }).onConflictDoNothing();
+        coverImage: coverImage || null,
+        bannerImage: bannerImage || null,
+        description: description || null,
+        rating: rating ? parseFloat(rating) : 4.8,
+        status: 'RELEASING',
+        genres: Array.isArray(genres) ? genres : [],
+        updatedAt: new Date()
+      }).onConflictDoUpdate({
+        target: media.id,
+        set: {
+          title,
+          coverImage: coverImage ? coverImage : undefined,
+          bannerImage: bannerImage ? bannerImage : undefined,
+          description: description ? description : undefined,
+          genres: Array.isArray(genres) && genres.length > 0 ? genres : undefined,
+          updatedAt: new Date()
+        }
+      });
     }
 
     // Upsert user progress

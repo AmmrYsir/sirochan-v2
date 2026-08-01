@@ -4,7 +4,7 @@ import Button from '../../components/common/Button.astro';
 import Badge from '../../components/common/Badge.astro';
 import { ApiService } from '../../db/apiService';
 import { db } from '../../db/client';
-import { bookmarks } from '../../db/schema';
+import { bookmarks, media } from '../../db/schema';
 import { eq, and } from 'drizzle-orm';
 import { MANGA_PLACEHOLDER, ANIME_PLACEHOLDER } from '../../utils/placeholders';
 import { decodePrivacySlug, getPrivacyReaderUrl, getPrivacyPlayerUrl } from '../../utils/privacy';
@@ -45,41 +45,32 @@ if (!liveTitleDetails) {
   }
 }
 
+// Query cached media entry from database
+const dbMedia = await db.query.media.findFirst({
+  where: eq(media.id, `${sourceId}:${titleId}`)
+});
+
 const rawDesc = liveTitleDetails?.description
   ? liveTitleDetails.description.replace(/<[^>]*>/g, '').replace(/&[a-z0-9#]+;/gi, '"')
-  : '';
+  : (dbMedia?.description || '');
 
 const rawDate = liveTitleDetails?.updatedAt || liveTitleDetails?.releasedAt || null;
 const humanDate = formatHumanDate(rawDate);
 
-const item = liveTitleDetails ? {
-  id: liveTitleDetails.sourceTitleId,
+const item = {
+  id: liveTitleDetails?.sourceTitleId || dbMedia?.sourceTitleId || titleId || 'title',
   sourceId: sourceId,
-  title: liveTitleDetails.title,
-  japaneseTitle: liveTitleDetails.altTitles?.[0] || liveTitleDetails.title,
-  type: liveTitleDetails.mediaType || 'manga',
-  coverImage: liveTitleDetails.thumbnailUrl || 'https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=600&q=80',
-  bannerImage: liveTitleDetails.thumbnailUrl || 'https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=1600&q=80',
-  description: rawDesc || 'Live metadata title details.',
-  rating: liveTitleDetails.rating || 4.8,
-  status: (liveTitleDetails.status?.toUpperCase() || 'RELEASING') as any,
-  genres: liveTitleDetails.tags?.length > 0 ? liveTitleDetails.tags : ['Action', 'Fantasy'],
-  latestChapterOrEpisode: `CH. ${liveTitleDetails.totalChapters || 1}`,
+  title: liveTitleDetails?.title || dbMedia?.title || titleId?.replace(/-/g, ' ').toUpperCase() || 'TITLE',
+  japaneseTitle: liveTitleDetails?.altTitles?.[0] || dbMedia?.japaneseTitle || '',
+  type: (liveTitleDetails?.mediaType || dbMedia?.type || 'manga') as 'manga' | 'anime',
+  coverImage: liveTitleDetails?.thumbnailUrl || dbMedia?.coverImage || MANGA_PLACEHOLDER,
+  bannerImage: liveTitleDetails?.thumbnailUrl || dbMedia?.bannerImage || ANIME_PLACEHOLDER,
+  description: rawDesc || 'Media title details.',
+  rating: liveTitleDetails?.rating || dbMedia?.rating || 4.8,
+  status: ((liveTitleDetails?.status || dbMedia?.status || 'RELEASING').toUpperCase()) as any,
+  genres: (liveTitleDetails?.tags?.length ? liveTitleDetails.tags : dbMedia?.genres) || ['Media'],
+  latestChapterOrEpisode: liveTitleDetails?.totalChapters ? `CH. ${liveTitleDetails.totalChapters}` : (dbMedia?.totalChapters ? `CH. ${dbMedia.totalChapters}` : 'CH. 1'),
   humanDate: humanDate
-} : {
-  id: titleId || 'title',
-  sourceId: sourceId,
-  title: titleId?.replace(/-/g, ' ').toUpperCase() || 'TITLE',
-  japaneseTitle: '',
-  type: 'manga' as const,
-  coverImage: 'https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=600&q=80',
-  bannerImage: 'https://images.unsplash.com/photo-1578632767115-351597cf2477?auto=format&fit=crop&w=1600&q=80',
-  description: 'Live title details.',
-  rating: 4.8,
-  status: 'RELEASING' as const,
-  genres: ['Manga'],
-  latestChapterOrEpisode: 'CH. 1',
-  humanDate: null
 };
 
 const mediaId = `${sourceId}:${item.id}`;
@@ -158,7 +149,13 @@ const firstChapterUrl = chapters[0]?.privacyUrl || '#';
             data-media-id={mediaId}
             data-source-id={sourceId}
             data-title={item.title}
+            data-japanese-title={item.japaneseTitle}
             data-type={item.type}
+            data-cover-image={item.coverImage}
+            data-banner-image={item.bannerImage}
+            data-description={item.description}
+            data-rating={item.rating}
+            data-genres={JSON.stringify(item.genres)}
             data-bookmarked={isBookmarked ? 'true' : 'false'}
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill={isBookmarked ? 'currentColor' : 'none'} stroke="currentColor" stroke-width="2">
@@ -248,7 +245,15 @@ const firstChapterUrl = chapters[0]?.privacyUrl || '#';
       const mediaId = bookmarkBtn.getAttribute('data-media-id');
       const sourceId = bookmarkBtn.getAttribute('data-source-id');
       const title = bookmarkBtn.getAttribute('data-title');
+      const japaneseTitle = bookmarkBtn.getAttribute('data-japanese-title');
       const type = bookmarkBtn.getAttribute('data-type');
+      const coverImage = bookmarkBtn.getAttribute('data-cover-image');
+      const bannerImage = bookmarkBtn.getAttribute('data-banner-image');
+      const description = bookmarkBtn.getAttribute('data-description');
+      const rating = bookmarkBtn.getAttribute('data-rating');
+      const genresRaw = bookmarkBtn.getAttribute('data-genres');
+      let genres = [];
+      try { genres = JSON.parse(genresRaw || '[]'); } catch (e) {}
 
       try {
         const res = await fetch('/api/library/bookmark', {
@@ -258,7 +263,13 @@ const firstChapterUrl = chapters[0]?.privacyUrl || '#';
             mediaId,
             sourceId,
             title,
+            japaneseTitle,
             type,
+            coverImage,
+            bannerImage,
+            description,
+            rating,
+            genres,
             action: isBookmarked ? 'remove' : 'add'
           })
         });
