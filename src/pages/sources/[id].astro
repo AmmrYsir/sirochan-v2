@@ -6,6 +6,7 @@ import Badge from '../../components/common/Badge.astro';
 import Button from '../../components/common/Button.astro';
 import { ApiService } from '../../db/apiService';
 import { MANGA_PLACEHOLDER, ANIME_PLACEHOLDER } from '../../utils/placeholders';
+import { getSourceBrand } from '../../utils/sourceIcons';
 
 
 function formatHumanDate(dateStr?: string | null): string | null {
@@ -104,9 +105,9 @@ const popularItems = sourceMedia.slice(0, 4);
       <div class="masthead-main">
         <div class="source-avatar-icon">
           {source.icon && (source.icon.startsWith('http') || source.icon.startsWith('/')) ? (
-            <img src={source.icon} alt={source.name} class="source-masthead-img-icon" onerror={`this.outerHTML='<span>${source.type === "manga" ? "📚" : "⚡"}</span>';`} />
+            <img src={source.icon} alt={source.name} class="source-masthead-img-icon" onerror={`this.outerHTML='<span>${getSourceBrand(source.id, source.type).icon}</span>';`} />
           ) : (
-            <span>{source.icon || '⚡'}</span>
+            <span>{source.icon || getSourceBrand(source.id, source.type).icon}</span>
           )}
         </div>
         <div class="source-masthead-info">

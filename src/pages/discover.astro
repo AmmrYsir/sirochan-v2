@@ -4,6 +4,7 @@ import MangaCard from '../components/media/MangaCard.astro';
 import AnimeCard from '../components/media/AnimeCard.astro';
 import Badge from '../components/common/Badge.astro';
 import { ApiService } from '../db/apiService';
+import { getSourceBrand } from '../utils/sourceIcons';
 
 const sources = await ApiService.getSources();
 const browseResults = await Promise.all(
@@ -66,9 +67,9 @@ const genres = ['All', ...combinedGenres];
               <div class="source-brand">
                 <span class="source-icon">
                   {src.icon && (src.icon.startsWith('http') || src.icon.startsWith('/')) ? (
-                    <img src={src.icon} alt={src.name} class="source-img-icon" onerror={`this.outerHTML='<span>${src.type === "manga" ? "📚" : "⚡"}</span>';`} />
+                    <img src={src.icon} alt={src.name} class="source-img-icon" onerror={`this.outerHTML='<span>${getSourceBrand(src.id, src.type).icon}</span>';`} />
                   ) : (
-                    <span>{src.icon || '⚡'}</span>
+                    <span>{src.icon || getSourceBrand(src.id, src.type).icon}</span>
                   )}
                 </span>
                 <div class="source-titles">

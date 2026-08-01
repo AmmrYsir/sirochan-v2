@@ -12,6 +12,8 @@ async function fetchLoouwd(path: string, options?: RequestInit): Promise<Respons
 // Simple in-memory cache to prevent HTTP 429 Rate-Limiting during build/SSR rendering
 const memoryCache = new Map<string, { data: any; expiry: number }>();
 
+import { getSourceBrand } from '../utils/sourceIcons';
+
 function getCached<T>(key: string): T | null {
 	const item = memoryCache.get(key);
 	if (item && item.expiry > Date.now()) {
@@ -145,7 +147,10 @@ export class ApiService {
 					?.map(opt => opt.label)
 					.filter(label => label && !label.toLowerCase().includes('all')) || [];
 
-				let icon = m.supportedMediaTypes.includes('manga') ? '📚' : '⚡';
+				const mediaType = m.supportedMediaTypes.includes('anime') && m.supportedMediaTypes.includes('manga') ? 'dual' : m.supportedMediaTypes[0] || 'manga';
+				const brand = getSourceBrand(m.id, mediaType);
+
+				let icon = brand.icon;
 				if (m.iconUrl && (m.iconUrl.startsWith('http') || m.iconUrl.startsWith('/'))) {
 					const cleanUrl = m.iconUrl.replace(/host\.docker\.internal/gi, 'localhost');
 					icon = `/api/proxy/image?url=${encodeURIComponent(cleanUrl)}`;
@@ -154,7 +159,7 @@ export class ApiService {
 				return {
 					id: m.id,
 					name: m.name,
-					type: m.supportedMediaTypes.includes('anime') && m.supportedMediaTypes.includes('manga') ? 'dual' : m.supportedMediaTypes[0] || 'manga',
+					type: mediaType,
 					language: 'EN',
 					icon: icon,
 					isPinned: true,
