@@ -14,6 +14,9 @@ export default defineConfig({
     // and computes url.origin as https://sirochan.enciknao.com, so the
     // default checkOrigin CSRF guard passes for same-origin POSTs
     // (e.g. /api/auth/logout) instead of returning 403.
-    allowedDomains: ['https://sirochan.enciknao.com', 'http://sirochan.enciknao.com']
+    allowedDomains: [
+      { hostname: 'sirochan.enciknao.com', protocol: 'https' },
+      { hostname: 'sirochan.enciknao.com', protocol: 'http' }
+    ]
   }
 });
