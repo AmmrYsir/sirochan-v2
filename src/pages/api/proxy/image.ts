@@ -1,6 +1,36 @@
 import type { APIRoute } from 'astro';
 import { cleanImageUrl } from '../../../utils/thumbnailCache';
 
+// SSRF guard: block requests to internal/private hosts
+const BLOCKED_HOST_PATTERNS = [
+  /^localhost$/i,
+  /\.local$/i,
+  /\.internal$/i,
+  /^127\./,
+  /^10\./,
+  /^192\.168\./,
+  /^172\.(1[6-9]|2[0-9]|3[0-1])\./,
+  /^169\.254\./,
+  /^0\./,
+  /^::1$/,
+  /^fc/i,
+  /^fd/i,
+  /^fe80/i,
+  /^100\.(6[4-9]|[7-9][0-9])\./,
+];
+
+function isBlockedUrl(rawUrl: string): boolean {
+  try {
+    const parsed = new URL(rawUrl);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return true;
+    const host = parsed.hostname;
+    if (BLOCKED_HOST_PATTERNS.some((re) => re.test(host))) return true;
+    return false;
+  } catch {
+    return true; // unparseable URL = blocked
+  }
+}
+
 export const GET: APIRoute = async ({ request }) => {
 	let urlParam = new URL(request.url).searchParams.get('url');
 
@@ -9,6 +39,11 @@ export const GET: APIRoute = async ({ request }) => {
 	}
 
 	urlParam = cleanImageUrl(urlParam);
+
+	// SSRF guard: reject internal/private targets before proxying
+	if (!urlParam.startsWith('/') && isBlockedUrl(urlParam)) {
+		return new Response('Blocked URL', { status: 403 });
+	}
 
 	// Detect LOOUWD_URL from process environment
 	const loouwdBase = process.env.LOOUWD_URL || (import.meta as any).env?.LOOUWD_URL;
